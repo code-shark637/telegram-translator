@@ -1,0 +1,118 @@
+import axios from 'axios';
+import Cookies from 'js-cookie';
+import type { User, TelegramAccount, TranslationResult, Language } from '../types';
+
+const API_BASE_URL = 'http://localhost:3001/api';
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use((config) => {
+  const token = Cookies.get('auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      Cookies.remove('auth_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const authAPI = {
+  login: async (username: string, password: string): Promise<{ user: User; token: string }> => {
+    const response = await api.post('/auth/login', { username, password });
+    return response.data;
+  },
+
+  register: async (username: string, password: string, email?: string): Promise<{ user: User; token: string }> => {
+    const response = await api.post('/auth/register', { username, password, email });
+    return response.data;
+  },
+
+  me: async (): Promise<User> => {
+    const response = await api.get('/auth/me');
+    return response.data;
+  },
+};
+
+// Telegram API
+export const telegramAPI = {
+  getAccounts: async (): Promise<{ accounts: TelegramAccount[] }> => {
+    const response = await api.get('/telegram/accounts');
+    return response.data;
+  },
+
+  addAccount: async (data: FormData): Promise<{ account: TelegramAccount }> => {
+    const response = await api.post('/telegram/accounts', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  connectAccount: async (accountId: number): Promise<{ connected: boolean }> => {
+    const response = await api.post(`/telegram/accounts/${accountId}/connect`);
+    return response.data;
+  },
+
+  disconnectAccount: async (accountId: number): Promise<{ connected: boolean }> => {
+    const response = await api.post(`/telegram/accounts/${accountId}/disconnect`);
+    return response.data;
+  },
+
+  deleteAccount: async (accountId: number): Promise<void> => {
+    await api.delete(`/telegram/accounts/${accountId}`);
+  },
+};
+
+// Translation API
+export const translationAPI = {
+  translate: async (
+    text: string,
+    targetLanguage: string,
+    sourceLanguage?: string,
+    engine?: string
+  ): Promise<TranslationResult> => {
+    const response = await api.post('/translation/translate', {
+      text,
+      targetLanguage,
+      sourceLanguage,
+      engine,
+    });
+    return response.data;
+  },
+
+  getEngines: async (): Promise<{ engines: string[] }> => {
+    const response = await api.get('/translation/engines');
+    return response.data;
+  },
+
+  getLanguages: async (): Promise<{ languages: Language[] }> => {
+    const response = await api.get('/translation/languages');
+    return response.data;
+  },
+};
+
+// Health check
+export const healthAPI = {
+  check: async (): Promise<{ status: string; timestamp: string; version: string }> => {
+    const response = await api.get('/health');
+    return response.data;
+  },
+};
