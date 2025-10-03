@@ -2,7 +2,7 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 import type { User, TelegramAccount, TranslationResult, Language } from '../types';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -34,12 +34,12 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: async (username: string, password: string): Promise<{ access_token: string; token_type: string }> => {
+  login: async (username: string, password: string): Promise<{ user: User; token: string }> => {
     const response = await api.post('/auth/login', { username, password });
     return response.data;
   },
 
-  register: async (username: string, password: string, email?: string): Promise<{ access_token: string; token_type: string }> => {
+  register: async (username: string, password: string, email?: string): Promise<{ user: User; token: string }> => {
     const response = await api.post('/auth/register', { username, password, email });
     return response.data;
   },
@@ -109,43 +109,9 @@ export const translationAPI = {
   },
 };
 
-// Conversations API
-export const conversationsAPI = {
-  getConversations: async (accountId: number) => {
-    const response = await api.get(`/telegram/accounts/${accountId}/conversations`);
-    return response.data;
-  },
-};
-
-// Messages API
-export const messagesAPI = {
-  getMessages: async (conversationId: number, limit: number = 50) => {
-    const response = await api.get(`/messages/conversations/${conversationId}/messages`, {
-      params: { limit }
-    });
-    return response.data;
-  },
-
-  sendMessage: async (conversationId: number, text: string, translate: boolean = true) => {
-    const response = await api.post('/messages/send', {
-      conversation_id: conversationId,
-      text,
-      translate
-    });
-    return response.data;
-  },
-
-  translateText: async (text: string, targetLanguage: string, sourceLanguage: string = 'auto') => {
-    const response = await api.post('/messages/translate', null, {
-      params: { text, target_language: targetLanguage, source_language: sourceLanguage }
-    });
-    return response.data;
-  },
-};
-
 // Health check
 export const healthAPI = {
-  check: async (): Promise<{ status: string; database: string }> => {
+  check: async (): Promise<{ status: string; timestamp: string; version: string }> => {
     const response = await api.get('/health');
     return response.data;
   },
