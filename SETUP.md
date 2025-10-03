@@ -7,7 +7,7 @@ Complete setup guide for the Telegram Translator application with FastAPI backen
 - Node.js 18+ and npm
 - Python 3.9+
 - Telegram account and API credentials
-- Supabase account (database already configured)
+- Local PostgreSQL 13+
 
 ## Step 1: Get Telegram API Credentials
 
@@ -28,11 +28,9 @@ Complete setup guide for the Telegram Translator application with FastAPI backen
 cd backend
 ```
 
-2. Update the `.env` file with your credentials:
+2. Create or update the `.env` file with your local settings:
 ```env
-SUPABASE_URL=https://qkfmkyulfrzwiimjapmr.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZm1reXVsZnJ6d2lpbWphcG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk0NzQxNTYsImV4cCI6MjA3NTA1MDE1Nn0.7UVxN77Wo6Z4WzrxHgsOuADhZvWuQPA1Nw0Ht9yPO6o
-DATABASE_URL=postgresql://postgres.qkfmkyulfrzwiimjapmr:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/telegram_translator
 
 JWT_SECRET_KEY=your-very-long-random-secret-key-change-this
 JWT_ALGORITHM=HS256
@@ -45,7 +43,7 @@ FRONTEND_URL=http://localhost:5173
 ```
 
 Important:
-- Replace `YOUR-PASSWORD` with your Supabase database password
+- Replace `YOUR-PASSWORD` with your local Postgres password
 - Replace `YOUR_API_ID_HERE` with your Telegram API ID
 - Replace `YOUR_API_HASH_HERE` with your Telegram API hash
 - Generate a secure random string for `JWT_SECRET_KEY`
@@ -66,19 +64,17 @@ npm install
 
 ## Step 4: Database Setup
 
-The database schema has already been applied to your Supabase instance. To verify:
+Create the database locally:
 
-1. Go to https://supabase.com/dashboard
-2. Select your project
-3. Navigate to Table Editor
-4. You should see these tables:
-   - users
-   - telegram_accounts
-   - conversations
-   - messages
-   - contacts
-   - scheduled_messages
-   - translation_engines
+1. Create database:
+```sql
+CREATE DATABASE telegram_translator;
+```
+
+2. Ensure your Postgres user has access:
+```sql
+GRANT ALL PRIVILEGES ON DATABASE telegram_translator TO postgres;
+```
 
 ## Step 5: Start the Application
 
@@ -216,7 +212,7 @@ pip install -r requirements.txt
 
 **Error: Database connection failed**
 - Check your DATABASE_URL in .env
-- Verify Supabase project is active
+- Verify PostgreSQL is running locally
 - Check your database password
 
 **Error: Telegram API error**
@@ -314,7 +310,7 @@ For issues or questions:
 1. Check backend logs: Look for errors in terminal
 2. Check frontend console: Open browser DevTools
 3. Review API documentation: http://localhost:8000/docs
-4. Check Supabase logs in dashboard
+4. Check PostgreSQL logs
 
 ## Next Steps
 

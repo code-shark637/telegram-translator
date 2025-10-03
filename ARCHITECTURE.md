@@ -2,7 +2,7 @@
 
 ## Overview
 
-Multi-account Telegram translator system with real-time message translation. Built with React frontend, FastAPI backend, Telethon for Telegram integration, and PostgreSQL (Supabase) for data persistence.
+Multi-account Telegram translator system with real-time message translation. Built with React frontend, FastAPI backend, Telethon for Telegram integration, and local PostgreSQL for data persistence.
 
 ## Technology Stack
 
@@ -27,9 +27,8 @@ Multi-account Telegram translator system with real-time message translation. Bui
 - **uvicorn** - ASGI server
 
 ### Database
-- **PostgreSQL** - Relational database
-- **Supabase** - Hosted PostgreSQL with RLS
-- **Row Level Security** - Data isolation
+- **PostgreSQL** - Relational database (local or managed)
+- **Row Level Security** - Data isolation (recommended for production)
 
 ## System Architecture
 
@@ -92,8 +91,7 @@ Multi-account Telegram translator system with real-time message translation. Bui
 └────────────┼──────────────────────────────────────────┘
              │
       ┌──────▼──────┐        ┌────────────────┐
-      │  Telegram   │        │   Supabase     │
-      │   Servers   │        │  PostgreSQL    │
+      │  Telegram   │        │  PostgreSQL    │
       └─────────────┘        └────────────────┘
 ```
 
@@ -491,7 +489,7 @@ Internet
 [Load Balancer]
    │
    ├──► [Backend Instance 1] ──┐
-   ├──► [Backend Instance 2] ──┼──► [Supabase PostgreSQL]
+   ├──► [Backend Instance 2] ──┼──► [PostgreSQL]
    └──► [Backend Instance 3] ──┘
    │
    └──► [Frontend CDN]

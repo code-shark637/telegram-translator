@@ -1,6 +1,6 @@
 # Telegram Translator
 
-A comprehensive React + Node.js + PostgreSQL application for real-time Telegram message translation with multi-account support.
+A comprehensive React + FastAPI + PostgreSQL application for real-time Telegram message translation with multi-account support.
 
 ## Features
 
@@ -26,8 +26,8 @@ A comprehensive React + Node.js + PostgreSQL application for real-time Telegram 
 
 ### Technical Architecture
 - **Frontend**: React 18 + TypeScript + Tailwind CSS
-- **Backend**: Node.js + Express + Socket.IO
-- **Database**: PostgreSQL with comprehensive schema
+- **Backend**: FastAPI (Python) + WebSocket
+- **Database**: PostgreSQL (local)
 - **Real-time**: WebSocket connections for live updates
 - **Translation**: Multiple engine support with fallback
 - **Session Management**: Telethon-compatible session handling
@@ -39,45 +39,37 @@ A comprehensive React + Node.js + PostgreSQL application for real-time Telegram 
 - PostgreSQL 13+
 - Google Translate API key (recommended)
 
-### Database Setup
+### Database Setup (Local PostgreSQL)
 
 1. Create PostgreSQL database:
 ```sql
 CREATE DATABASE telegram_translator;
 ```
 
-2. Run the schema:
-```bash
-psql -d telegram_translator -f server/src/database/schema.sql
+2. Create a user (if needed) and grant privileges:
+```sql
+CREATE USER postgres WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE telegram_translator TO postgres;
 ```
 
 ### Environment Configuration
 
-1. Copy environment template:
-```bash
-cp server/.env.example server/.env
-```
-
-2. Configure your `.env` file:
+Create `backend/.env` with:
 ```env
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=telegram_translator
-DB_USER=postgres
-DB_PASSWORD=your_password
+# Database (local Postgres)
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/telegram_translator
 
-# Server
-PORT=3001
-NODE_ENV=development
-JWT_SECRET=your_super_secret_jwt_key
-
-# Translation
-GOOGLE_TRANSLATE_KEY=your_google_translate_api_key
+# Auth
+JWT_SECRET_KEY=your_super_secret_jwt_key
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
 # Telegram API (get from my.telegram.org)
 TELEGRAM_API_ID=your_api_id
 TELEGRAM_API_HASH=your_api_hash
+
+# Frontend
+FRONTEND_URL=http://localhost:5173
 ```
 
 ### Installation Steps
@@ -87,14 +79,14 @@ TELEGRAM_API_HASH=your_api_hash
 npm run install:all
 ```
 
-2. Start development servers:
+2. Start development servers (FastAPI + Vite):
 ```bash
 npm run dev
 ```
 
 The application will be available at:
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:3001
+- Backend API: http://localhost:8000
 
 ## Usage Guide
 
@@ -143,15 +135,17 @@ telegram-translator/
 │   ├── hooks/            # Custom React hooks
 │   ├── services/         # API services
 │   └── types/            # TypeScript definitions
-├── server/               # Node.js backend
-│   ├── src/
-│   │   ├── config/       # Configuration
-│   │   ├── database/     # Database schema & connection
-│   │   ├── middleware/   # Express middleware
-│   │   ├── routes/       # API routes
-│   │   ├── services/     # Business logic
-│   │   └── utils/        # Utilities
-│   └── package.json
+├── backend/               # FastAPI backend
+│   ├── main.py           # FastAPI application
+│   ├── config.py         # Configuration (env)
+│   ├── database.py       # PostgreSQL connection
+│   ├── models.py         # Pydantic models
+│   ├── auth.py           # JWT auth
+│   ├── routes_*.py       # API routes
+│   ├── translation_service.py
+│   ├── telethon_service.py
+│   ├── websocket_manager.py
+│   └── requirements.txt
 └── package.json
 ```
 
@@ -168,22 +162,7 @@ telegram-translator/
 
 ### API Endpoints
 
-**Authentication**:
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration
-- `GET /api/auth/me` - Get current user
-
-**Telegram Management**:
-- `GET /api/telegram/accounts` - List user's accounts
-- `POST /api/telegram/accounts` - Add new account
-- `POST /api/telegram/accounts/:id/connect` - Connect account
-- `POST /api/telegram/accounts/:id/disconnect` - Disconnect account
-- `DELETE /api/telegram/accounts/:id` - Delete account
-
-**Translation**:
-- `POST /api/translation/translate` - Translate text
-- `GET /api/translation/engines` - List available engines
-- `GET /api/translation/languages` - List supported languages
+See `backend/API.md` for the full FastAPI reference.
 
 ### Real-time Communication
 
@@ -253,12 +232,12 @@ Infrastructure exists for scheduled messaging:
 ### Build Process
 ```bash
 npm run build
-cd server && npm run build
+# Backend is Python; no build step required for deployment
 ```
 
 ### Environment Variables
 
-Ensure all production environment variables are configured:
+Ensure production environment variables are configured (see `backend/.env` template):
 - Secure JWT secrets
 - Production database credentials
 - Translation API keys
@@ -295,10 +274,7 @@ Ensure all production environment variables are configured:
 
 ### Logging
 
-Logs are stored in:
-- `logs/error.log` - Error messages
-- `logs/combined.log` - All messages
-- Console output in development
+Backend logs output to console. Configure Python logging handlers for files as needed.
 
 ## Contributing
 

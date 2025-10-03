@@ -8,14 +8,14 @@ FastAPI backend for managing 30+ Telegram sessions with real-time translation us
 - **Real-Time Translation**: Instant translation of incoming/outgoing messages using Google Translate
 - **Telethon Integration**: Full Telegram client functionality with TData session support
 - **WebSocket Support**: Real-time message updates to connected clients
-- **PostgreSQL Storage**: All messages (original and translated) stored in Supabase database
+- **PostgreSQL Storage**: All messages (original and translated) stored in local PostgreSQL
 - **JWT Authentication**: Secure user authentication and authorization
 - **CRM-Ready**: Extensible architecture for future features (scheduled messages, follow-ups, contact management)
 
 ## Requirements
 
 - Python 3.9+
-- PostgreSQL (Supabase)
+- PostgreSQL (local)
 - Telegram API credentials (api_id and api_hash)
 
 ## Installation
@@ -27,9 +27,7 @@ pip install -r requirements.txt
 
 2. Configure environment variables in `.env`:
 ```env
-SUPABASE_URL=your-supabase-url
-SUPABASE_KEY=your-supabase-anon-key
-DATABASE_URL=postgresql://user:password@host:port/database
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/telegram_translator
 
 JWT_SECRET_KEY=your-secret-key
 JWT_ALGORITHM=HS256
@@ -191,7 +189,7 @@ The architecture is designed for easy extension:
 
 - All API endpoints (except auth) require JWT authentication
 - Passwords hashed with bcrypt
-- Row Level Security (RLS) enabled on all database tables
+- Row Level Security (RLS) recommended for production
 - WebSocket connections require valid JWT token
 - API keys and secrets stored securely in environment variables
 
@@ -205,7 +203,7 @@ The architecture is designed for easy extension:
 
 ### Database Connection Issues
 - Verify DATABASE_URL is correct
-- Check Supabase connection pooling limits
+- Check PostgreSQL connection configuration
 - Ensure database migrations are applied
 
 ### WebSocket Issues

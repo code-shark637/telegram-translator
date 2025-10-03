@@ -2,8 +2,7 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
-    supabase_url: str
-    supabase_key: str
+    # PostgreSQL connection string, e.g. postgresql://postgres:password@localhost:5432/telegram_translator
     database_url: str
 
     jwt_secret_key: str
