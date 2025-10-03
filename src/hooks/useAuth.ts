@@ -46,13 +46,15 @@ export function useAuth() {
 
   const login = async (username: string, password: string): Promise<void> => {
     try {
-      const { user, token } = await authAPI.login(username, password);
-      
-      Cookies.set('auth_token', token, { expires: 1 }); // 1 day
-      
+      const { access_token } = await authAPI.login(username, password);
+
+      Cookies.set('auth_token', access_token, { expires: 7 });
+
+      const user = await authAPI.me();
+
       setAuthState({
         user,
-        token,
+        token: access_token,
         isAuthenticated: true,
         isLoading: false,
       });
@@ -63,13 +65,15 @@ export function useAuth() {
 
   const register = async (username: string, password: string, email?: string): Promise<void> => {
     try {
-      const { user, token } = await authAPI.register(username, password, email);
-      
-      Cookies.set('auth_token', token, { expires: 1 });
-      
+      const { access_token } = await authAPI.register(username, password, email);
+
+      Cookies.set('auth_token', access_token, { expires: 7 });
+
+      const user = await authAPI.me();
+
       setAuthState({
         user,
-        token,
+        token: access_token,
         isAuthenticated: true,
         isLoading: false,
       });
