@@ -76,6 +76,11 @@ CREATE DATABASE telegram_translator;
 GRANT ALL PRIVILEGES ON DATABASE telegram_translator TO postgres;
 ```
 
+3. Apply schema:
+```bash
+psql -d telegram_translator -h localhost -U postgres -f backend/database/schema.sql
+```
+
 ## Step 5: Start the Application
 
 ### Option 1: Start Both Frontend and Backend Together
@@ -102,6 +107,12 @@ npm run dev:client
 # or
 npm run dev
 ```
+
+### Verify everything works
+
+1. Open `http://localhost:5173` and sign up/sign in
+2. Health check: `curl http://localhost:8000/api/health`
+3. API docs: open `http://localhost:8000/docs`
 
 ## Step 6: First Time Usage
 

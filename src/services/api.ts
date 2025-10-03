@@ -52,18 +52,42 @@ export const authAPI = {
 
 // Telegram API
 export const telegramAPI = {
-  getAccounts: async (): Promise<{ accounts: TelegramAccount[] }> => {
+  getAccounts: async (): Promise<TelegramAccount[]> => {
     const response = await api.get('/telegram/accounts');
-    return response.data;
+    const items = response.data as any[];
+    return (items || []).map((a: any) => ({
+      id: a.id,
+      sessionName: a.session_name,
+      phoneNumber: a.phone_number ?? undefined,
+      accountName: a.account_name,
+      isActive: a.is_active,
+      sourceLanguage: a.source_language,
+      targetLanguage: a.target_language,
+      createdAt: a.created_at,
+      lastUsed: a.last_used ?? undefined,
+      isConnected: a.is_connected === true,
+    }));
   },
 
-  addAccount: async (data: FormData): Promise<{ account: TelegramAccount }> => {
+  addAccount: async (data: FormData): Promise<TelegramAccount> => {
     const response = await api.post('/telegram/accounts', data, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    const a = response.data;
+    return {
+      id: a.id,
+      sessionName: a.session_name,
+      phoneNumber: a.phone_number ?? undefined,
+      accountName: a.account_name,
+      isActive: a.is_active,
+      sourceLanguage: a.source_language,
+      targetLanguage: a.target_language,
+      createdAt: a.created_at,
+      lastUsed: a.last_used ?? undefined,
+      isConnected: a.is_connected === true,
+    } as TelegramAccount;
   },
 
   connectAccount: async (accountId: number): Promise<{ connected: boolean }> => {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { MessageCircle, AlertCircle, Loader } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginFormData {
   username: string;
@@ -16,6 +17,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -29,6 +31,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
     try {
       await login(data.username, data.password);
+      navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed');
     } finally {

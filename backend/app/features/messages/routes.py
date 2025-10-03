@@ -1,21 +1,23 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
+from app.core.database import db
+from app.core.security import get_current_user
 from models import MessageResponse, MessageSend
-from auth import get_current_user
-from database import db
 from telethon_service import telethon_service
 from translation_service import translation_service
 from websocket_manager import manager
 import logging
 
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/messages", tags=["messages"])
+
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
 async def get_messages(
     conversation_id: int,
     limit: int = 50,
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
 ):
     conversation = await db.fetchrow(
         """
@@ -23,13 +25,13 @@ async def get_messages(
         JOIN telegram_accounts ta ON c.telegram_account_id = ta.id
         WHERE c.id = $1
         """,
-        conversation_id
+        conversation_id,
     )
 
     if not conversation or conversation['user_id'] != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found"
+            detail="Conversation not found",
         )
 
     messages = await db.fetch(
@@ -40,7 +42,7 @@ async def get_messages(
         LIMIT $2
         """,
         conversation_id,
-        limit
+        limit,
     )
 
     result = []
@@ -57,15 +59,16 @@ async def get_messages(
             "target_language": msg['target_language'],
             "created_at": msg['created_at'],
             "edited_at": msg['edited_at'],
-            "is_outgoing": msg['sender_user_id'] is None
+            "is_outgoing": msg['sender_user_id'] is None,
         })
 
     return result
 
+
 @router.post("/send", response_model=MessageResponse)
 async def send_message(
     message_data: MessageSend,
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
 ):
     conversation = await db.fetchrow(
         """
@@ -74,13 +77,13 @@ async def send_message(
         JOIN telegram_accounts ta ON c.telegram_account_id = ta.id
         WHERE c.id = $1
         """,
-        message_data.conversation_id
+        message_data.conversation_id,
     )
 
     if not conversation or conversation['user_id'] != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found"
+            detail="Conversation not found",
         )
 
     original_text = message_data.text
@@ -90,7 +93,7 @@ async def send_message(
         translation = await translation_service.translate_text(
             original_text,
             conversation['target_language'],
-            conversation['source_language']
+            conversation['source_language'],
         )
         translated_text = translation['translated_text']
 
@@ -98,7 +101,7 @@ async def send_message(
         sent_message = await telethon_service.send_message(
             conversation['telegram_account_id'],
             conversation['telegram_peer_id'],
-            translated_text
+            translated_text,
         )
 
         message_id = await db.fetchval(
@@ -116,13 +119,13 @@ async def send_message(
             translated_text,
             conversation['source_language'],
             conversation['target_language'],
-            sent_message['date']
+            sent_message['date'],
         )
 
         await db.execute(
             "UPDATE conversations SET last_message_at = $1 WHERE id = $2",
             sent_message['date'],
-            message_data.conversation_id
+            message_data.conversation_id,
         )
 
         message_response = {
@@ -137,16 +140,16 @@ async def send_message(
             "target_language": conversation['target_language'],
             "created_at": sent_message['date'],
             "edited_at": None,
-            "is_outgoing": True
+            "is_outgoing": True,
         }
 
         await manager.send_to_account(
             {
                 "type": "new_message",
-                "message": message_response
+                "message": message_response,
             },
             conversation['telegram_account_id'],
-            current_user.user_id
+            current_user.user_id,
         )
 
         return message_response
@@ -155,20 +158,24 @@ async def send_message(
         logger.error(f"Error sending message: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send message: {str(e)}"
+            detail=f"Failed to send message: {str(e)}",
         )
+
 
 @router.post("/translate")
 async def translate_message(
     text: str,
     target_language: str,
     source_language: str = "auto",
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
 ):
     translation = await translation_service.translate_text(
         text,
         target_language,
-        source_language
+        source_language,
     )
 
     return translation
+
+
+

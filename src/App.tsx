@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useSocket } from './hooks/useSocket';
 
 // Components
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import Logout from './components/Auth/Logout';
 import Header from './components/Layout/Header';
 import Sidebar from './components/Layout/Sidebar';
 import ChatWindow from './components/Chat/ChatWindow';
@@ -23,14 +24,13 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   // Socket connection
-  const { socket, joinRoom, leaveRoom } = useSocket();
+  const { ws, onMessage } = useSocket();
 
   // App state
   const [accounts, setAccounts] = useState<TelegramAccount[]>([]);
   const [currentAccount, setCurrentAccount] = useState<TelegramAccount | null>(null);
   const [messages, setMessages] = useState<TelegramMessage[]>([]);
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   // Load accounts on mount
   useEffect(() => {
@@ -41,41 +41,29 @@ function App() {
 
   // Socket event listeners
   useEffect(() => {
-    if (socket) {
-      socket.on('new_message', (message: TelegramMessage) => {
-        setMessages(prev => [...prev, message]);
-      });
-
-      socket.on('account_connected', (data: { accountId: number }) => {
-        setAccounts(prev => prev.map(acc => 
-          acc.id === data.accountId ? { ...acc, isConnected: true } : acc
-        ));
-      });
-
-      socket.on('account_disconnected', (data: { accountId: number }) => {
-        setAccounts(prev => prev.map(acc => 
-          acc.id === data.accountId ? { ...acc, isConnected: false } : acc
-        ));
-      });
-
-      return () => {
-        socket.off('new_message');
-        socket.off('account_connected');
-        socket.off('account_disconnected');
-      };
-    }
-  }, [socket]);
+    const unsubscribe = onMessage((data: any) => {
+      if (data?.type === 'new_message' && data.message) {
+        setMessages(prev => [...prev, data.message]);
+      }
+      if (data?.type === 'account_connected' && typeof data.account_id === 'number') {
+        setAccounts(prev => prev.map(acc => acc.id === data.account_id ? { ...acc, isConnected: true } : acc));
+      }
+      if (data?.type === 'account_disconnected' && typeof data.account_id === 'number') {
+        setAccounts(prev => prev.map(acc => acc.id === data.account_id ? { ...acc, isConnected: false } : acc));
+      }
+    });
+    return unsubscribe;
+  }, [onMessage]);
 
   const loadAccounts = async () => {
     try {
-      const response = await telegramAPI.getAccounts();
-      setAccounts(response.accounts);
+      const accounts = await telegramAPI.getAccounts();
+      setAccounts(accounts);
       
       // Auto-select first connected account
-      const connectedAccount = response.accounts.find(acc => acc.isConnected);
+      const connectedAccount = accounts.find(acc => acc.isConnected);
       if (connectedAccount && !currentAccount) {
         setCurrentAccount(connectedAccount);
-        joinRoom(connectedAccount.id);
       }
     } catch (error) {
       console.error('Failed to load accounts:', error);
@@ -83,11 +71,7 @@ function App() {
   };
 
   const handleAccountSelect = (account: TelegramAccount) => {
-    if (currentAccount) {
-      leaveRoom(currentAccount.id);
-    }
     setCurrentAccount(account);
-    joinRoom(account.id);
     setMessages([]); // Clear messages when switching accounts
   };
 
@@ -148,6 +132,7 @@ function App() {
               <LoginForm onSwitchToRegister={() => setAuthMode('register')} />
             }
           />
+          <Route path="/logout" element={<Logout />} />
           <Route
             path="/register"
             element={
@@ -171,8 +156,9 @@ function App() {
 
   // Main application
   return (
+    <Router>
     <div className="h-screen flex flex-col bg-gray-900">
-      <Header onSettingsClick={() => setShowSettings(true)} />
+      <Header onSettingsClick={() => {}} />
       
       <div className="flex-1 flex overflow-hidden">
         <Sidebar
@@ -200,6 +186,7 @@ function App() {
         onSuccess={loadAccounts}
       />
     </div>
+    </Router>
   );
 }
 

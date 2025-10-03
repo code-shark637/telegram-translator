@@ -58,6 +58,9 @@ export function useAuth() {
         isAuthenticated: true,
         isLoading: false,
       });
+
+      // Ensure the root App re-evaluates auth branch immediately
+      window.location.replace('/');
     } catch (error) {
       throw error;
     }
@@ -77,6 +80,9 @@ export function useAuth() {
         isAuthenticated: true,
         isLoading: false,
       });
+
+      // Ensure the root App re-evaluates auth branch immediately
+      window.location.replace('/');
     } catch (error) {
       throw error;
     }
@@ -90,6 +96,9 @@ export function useAuth() {
       isAuthenticated: false,
       isLoading: false,
     });
+
+    // Force navigation to login and re-render root auth branch
+    window.location.replace('/login');
   };
 
   return {

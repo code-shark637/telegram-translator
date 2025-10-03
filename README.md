@@ -52,6 +52,11 @@ CREATE USER postgres WITH PASSWORD 'your_password';
 GRANT ALL PRIVILEGES ON DATABASE telegram_translator TO postgres;
 ```
 
+3. Apply schema:
+```bash
+psql -d telegram_translator -h localhost -U postgres -f backend/database/schema.sql
+```
+
 ### Environment Configuration
 
 Create `backend/.env` with:

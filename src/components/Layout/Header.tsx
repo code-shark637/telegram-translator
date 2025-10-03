@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageCircle, Settings, LogOut, User } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   onSettingsClick: () => void;
@@ -8,6 +9,7 @@ interface HeaderProps {
 
 export default function Header({ onSettingsClick }: HeaderProps) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="bg-gray-900 border-b border-gray-700 px-6 py-4">
@@ -32,7 +34,10 @@ export default function Header({ onSettingsClick }: HeaderProps) {
           </button>
           
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
             className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors"
             title="Logout"
           >

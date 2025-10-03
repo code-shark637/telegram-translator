@@ -5,7 +5,7 @@ from typing import Dict, Optional, List, Callable
 from telethon import TelegramClient, events
 from telethon.tl.types import User, Chat, Channel, Message, PeerUser, PeerChat, PeerChannel
 from telethon.sessions import StringSession
-from config import settings
+from app.core.config import settings
 from database import db
 import json
 

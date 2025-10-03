@@ -2,14 +2,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-from config import settings
+from app.core.config import settings
 from database import db
 from telethon_service import telethon_service
 from websocket_manager import manager
 from translation_service import translation_service
-from routes_auth import router as auth_router
-from routes_telegram import router as telegram_router
-from routes_messages import router as messages_router
+from app.features.auth.routes import router as auth_router
+from app.features.telegram.routes import router as telegram_router
+from app.features.messages.routes import router as messages_router
 from auth import get_current_user
 from jose import jwt, JWTError
 
