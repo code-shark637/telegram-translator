@@ -9,9 +9,9 @@ Complete setup guide for the Telegram Translator application with FastAPI backen
 - Telegram account and API credentials
 - Local PostgreSQL 13+
 
-## Step 1: Prepare Telegram Desktop tdata
+## Step 1: Prepare Telegram Desktop tdata (.zip)
 
-Export or locate your Telegram Desktop `tdata` folder (you will upload a zip in-app). You don't need to configure `api_id`/`api_hash` manually; they are read from `tdata`.
+Ensure you already have your Telegram Desktop `tdata` exported as a `.zip` file. You'll upload this zip in the app. You don't need to configure `api_id`/`api_hash` manually; they are read from `tdata`.
 
 ## Step 2: Configure Backend
 
@@ -108,35 +108,11 @@ npm run dev:client
 
 ## Adding Telegram Accounts
 
-### Method 1: Using Telegram Desktop TData
+### Using Telegram Desktop tdata (.zip)
 
-1. Open Telegram Desktop
-2. Go to Settings → Advanced → Export Telegram data
-3. Or locate your TData folder:
-   - Windows: `%APPDATA%\Telegram Desktop\tdata`
-   - macOS: `~/Library/Application Support/Telegram Desktop/tdata`
-   - Linux: `~/.local/share/TelegramDesktop/tdata`
-
-4. In the app, click "Add Account"
-5. Upload the TData folder or files
-6. Set your preferred source and target languages
-7. Click "Connect"
-
-### Method 2: Using Phone Number (Fresh Login)
-
-1. Click "Add Account"
-2. Enter a session name (e.g., "main_account")
-3. Enter your phone number (with country code, e.g., +1234567890)
-4. You'll receive a login code via Telegram
-5. Enter the code to complete authentication
-
-### Method 3: Using Session String
-
-If you have a Telethon session string from another application:
-
-1. Click "Add Account"
-2. Enter session name
-3. Paste the session string
+1. In the app, click "Add Account"
+2. Upload your `tdata` `.zip` file
+3. Set your preferred source and target languages
 4. Click "Connect"
 
 ## How It Works
@@ -162,8 +138,8 @@ If you have a Telethon session string from another application:
 ### Language Settings
 
 Each Telegram account has:
-- **Source Language**: Your language (what you type in)
-- **Target Language**: Language for translation (what they see)
+- **Source Language**: Language for translation (what they see)
+- **Target Language**: Your language (what you type in)
 
 You can have different language settings for each account.
 
@@ -209,7 +185,7 @@ pip install -r requirements.txt
 - Check your database password
 
 **Error: Telegram API error**
-- Verify api_id and api_hash are correct
+- Verify `tdata` contains valid API credentials
 - Check you're not exceeding API limits
 - Try regenerating API credentials
 
@@ -232,9 +208,9 @@ PORT=3000 npm run dev:client
 ### Cannot Add Telegram Account
 
 **Session not authorized**
-- Phone number format must include country code (+1234567890)
-- TData files must be from Telegram Desktop
-- Session string must be valid Telethon format
+- `tdata` zip must be exported from Telegram Desktop
+- Zip should contain the `tdata` directory and expected files
+- Ensure the zip is not password-protected or corrupted
 
 **Connection timeout**
 - Check your internet connection
@@ -252,40 +228,6 @@ PORT=3000 npm run dev:client
 - Check backend logs for translation errors
 - Verify Google Translate isn't rate-limiting
 - Check source/target languages are valid
-
-## Production Deployment
-
-### Backend
-
-1. Set production environment variables
-2. Use production-grade ASGI server:
-```bash
-pip install gunicorn
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
-```
-
-3. Set up reverse proxy (nginx):
-```nginx
-location /api {
-    proxy_pass http://127.0.0.1:8000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-}
-
-location /ws {
-    proxy_pass http://127.0.0.1:8000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-}
-```
-
-### Frontend
-
-```bash
-npm run build
-# Deploy dist/ folder to your hosting provider
-```
 
 ## Security Notes
 
@@ -312,4 +254,3 @@ After setup:
 - Test real-time translation
 - Customize language settings per account
 - Explore conversation management
-- Plan CRM features integration

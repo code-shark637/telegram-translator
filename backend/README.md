@@ -1,6 +1,6 @@
 # Telegram Translator Backend (FastAPI)
 
-FastAPI backend for managing 30+ Telegram sessions with real-time translation using Telethon.
+FastAPI backend for managing Telegram sessions with real-time translation using Telethon.
 
 ## Features
 
@@ -78,7 +78,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 #### `telethon_service.py`
 Manages all Telegram sessions using Telethon library. Handles:
-- Session creation from TData or string sessions
+- Session creation from TData zip only
 - Connection/disconnection of accounts
 - Message sending/receiving
 - Real-time event handlers
@@ -124,56 +124,22 @@ PostgreSQL connection pool management:
 - `telegram_accounts` - Telegram account configurations
 - `conversations` - Telegram chats/channels per account
 - `messages` - All messages with original and translated text
-- `contacts` - Contact management (CRM features)
-- `scheduled_messages` - Future scheduled message sending
-- `translation_engines` - Translation service configurations
+ 
 
 ## Adding Telegram Accounts
 
-### Method 1: Session String
-If you have a Telethon session string:
-```python
-POST /api/telegram/accounts
-{
-  "session_name": "my_account",
-  "account_name": "My Account",
-  "phone_number": "+1234567890",
-  "session_string": "your_session_string",
-  "source_language": "en",
-  "target_language": "es"
-}
-```
-
-### Method 2: TData Upload
-Upload Telegram Desktop TData folder:
+### TData Zip Upload (only)
+Upload Telegram Desktop TData zip:
 ```bash
 curl -X POST http://localhost:8000/api/telegram/accounts \
   -H "Authorization: Bearer {token}" \
-  -F "session_name=my_account" \
-  -F "account_name=My Account" \
-  -F "phone_number=+1234567890" \
-  -F "tdata_file=@/path/to/tdata.zip"
+  -F "displayName=My Account" \
+  -F "sourceLanguage=auto" \
+  -F "targetLanguage=en" \
+  -F "tdata=@/path/to/tdata.zip"
 ```
 
-## Extension Points
-
-The architecture is designed for easy extension:
-
-### Adding New Translation Engines
-1. Create new translator class in `translation_service.py`
-2. Implement `translate_text()` method
-3. Update API to support engine selection
-
-### Adding Scheduled Messages
-1. Create background task scheduler
-2. Implement message queue in database
-3. Add cron job to process scheduled messages
-
-### Adding CRM Features
-1. Use existing `contacts` table
-2. Add routes for contact management
-3. Implement follow-up tracking
-4. Add tag-based filtering
+ 
 
 ## Security
 
@@ -186,9 +152,8 @@ The architecture is designed for easy extension:
 ## Troubleshooting
 
 ### Telegram Connection Issues
-- Verify API credentials are correct
+- Verify `tdata` zip contains valid API credentials
 - Check if session files exist in `sessions/` directory
-- Ensure phone number format is correct (+country code)
 - Check Telegram API rate limits
 
 ### Database Connection Issues
@@ -213,15 +178,7 @@ The architecture is designed for easy extension:
 
 - [ ] Support for message media (photos, videos, documents)
 - [ ] Translation caching for repeated phrases
-- [ ] Multiple translation engine support (DeepL, Azure, etc.)
-- [ ] Scheduled message sending
-- [ ] Automatic follow-ups after X days
-- [ ] Advanced CRM features (tags, notes, custom fields)
 - [ ] Message templates and quick replies
 - [ ] Bulk message operations
 - [ ] Analytics and statistics
 - [ ] Export conversation history
-
-## License
-
-MIT
