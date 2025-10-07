@@ -143,7 +143,6 @@ List all Telegram accounts for authenticated user.
     "id": 1,
     "session_name": "main_account",
     "account_name": "My Main Account",
-    "phone_number": "+1234567890",
     "is_active": true,
     "source_language": "en",
     "target_language": "es",
@@ -186,7 +185,6 @@ curl -X POST http://localhost:8000/api/telegram/accounts \
   "id": 2,
   "session_name": "my_account",
   "account_name": "My Account",
-  "phone_number": "+1234567890",
   "is_active": true,
   "source_language": "en",
   "target_language": "es",
@@ -211,11 +209,6 @@ Connect to Telegram for specific account.
 
 **Parameters**:
 - `account_id` (path): Account ID to connect
-
-**Request Body** (optional):
-```
-session_string: string (optional)
-```
 
 **Response**:
 ```json
@@ -278,7 +271,6 @@ All fields are optional.
   "id": 1,
   "session_name": "main_account",
   "account_name": "Updated Account Name",
-  "phone_number": "+1234567890",
   "is_active": true,
   "source_language": "fr",
   "target_language": "de",
@@ -628,36 +620,15 @@ Response:
 
 ## Language Codes
 
-Supported language codes for translation:
+Supported language codes (current):
 
 - `auto` - Auto-detect (source only)
 - `en` - English
 - `es` - Spanish
 - `fr` - French
 - `de` - German
-- `it` - Italian
-- `pt` - Portuguese
 - `ru` - Russian
-- `ja` - Japanese
-- `ar` - Arabic
-- `hi` - Hindi
-- `tr` - Turkish
-- `pl` - Polish
-- `nl` - Dutch
-- `sv` - Swedish
-- `da` - Danish
-- `no` - Norwegian
-- `fi` - Finnish
-
----
-
-## Rate Limiting
-
-Currently no rate limiting is implemented, but it's recommended for production:
-
-- Authentication endpoints: 5 requests per minute per IP
-- API endpoints: 60 requests per minute per user
-- WebSocket: 1 connection per user
+- `zh` - Chinese
 
 ---
 
@@ -676,7 +647,6 @@ All methods and headers are allowed for these origins.
 
 - All timestamps are in ISO 8601 format (UTC)
 - All IDs are integers (bigint)
-- Phone numbers must include country code (e.g., +1234567890)
 - Session names must be unique per user
 - WebSocket connections require valid JWT token
 - Original and translated text are both stored for all messages

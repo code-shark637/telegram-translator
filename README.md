@@ -7,7 +7,7 @@ A comprehensive React + FastAPI + PostgreSQL application for real-time Telegram 
 ### Core Functionality
 - **Real-time Translation**: Incoming messages appear in original language with translated subtitles
 - **Auto-translation**: Outgoing messages are translated before sending
-- **Multi-account Support**: Manage multiple Telegram accounts with TData sessions
+- **Multi-account Support**: Manage multiple Telegram accounts with TData zip sessions
 - **Session Management**: Add, remove, and switch between Telegram accounts
 - **Language Configuration**: Set source/target languages per account
 - **Message Storage**: All messages (original + translated) stored in PostgreSQL
@@ -99,7 +99,7 @@ The application will be available at:
 
 ### Adding Telegram Accounts
 
-1. Export your Telegram Desktop `tdata` as a zip
+1. Prepare your Telegram Desktop `tdata` zip
 2. Click "Add Account" in the sidebar
 3. Provide a display name and select languages
 4. Upload the `tdata` zip (the backend will extract `app_id` and `app_hash` from it automatically)
@@ -109,7 +109,7 @@ The application will be available at:
 
 - **Source Language**: Choose specific language or "Auto-detect"
 - **Target Language**: Your preferred translation language
-- **Translation Engine**: Primary engine with automatic fallback
+ 
 
 ### Message Flow
 
@@ -171,35 +171,6 @@ Native WebSocket endpoint:
 - Heartbeat: send `{ "type": "ping" }`, server replies `{ "type": "pong" }`
 - Server push: `{ "type": "new_message", "message": { ... } }`
 
-## Extension Points
-
-### Adding Translation Engines
-
-1. Implement `TranslationEngine` interface in `server/src/services/translationService.ts`
-2. Register engine in `TranslationService` constructor
-3. Add configuration to database `translation_engines` table
-
-### Adding Message Types
-
-1. Extend `message_type` enum in database schema
-2. Add handling in `TelegramService`
-3. Update frontend components for new message types
-
-### CRM Features
-
-The schema includes `contacts` table for future CRM functionality:
-- Contact tagging and categorization
-- Interaction history
-- Favorite/blocked status
-- Notes and custom fields
-
-### Scheduled Messages
-
-Infrastructure exists for scheduled messaging:
-- `scheduled_messages` table
-- Cron job framework in place
-- API endpoints ready for implementation
-
 ## Development
 
 ### Code Standards
@@ -260,11 +231,6 @@ Ensure production environment variables are configured (see `backend/.env` templ
 - Check connection credentials
 - Ensure database exists
 
-**Translation API Errors**:
-- Verify API keys are correct
-- Check API quotas and limits
-- Ensure fallback engines are configured
-
 **TData Session Import**:
 - Verify TData file format
 - Check Telegram API credentials
@@ -280,10 +246,6 @@ Backend logs output to console. Configure Python logging handlers for files as n
 2. Create feature branch
 3. Implement changes with tests
 4. Submit pull request with detailed description
-
-## License
-
-This project is for educational and development purposes. Ensure compliance with Telegram's Terms of Service when using with real accounts.
 
 ## Support
 

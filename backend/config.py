@@ -9,9 +9,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 10080
 
-    telegram_api_id: int
-    telegram_api_hash: str
-
     frontend_url: str = "http://localhost:5173"
 
     class Config:
