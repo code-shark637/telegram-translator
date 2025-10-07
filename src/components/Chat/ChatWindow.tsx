@@ -77,16 +77,11 @@ export default function ChatWindow({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-white">Translation Chat</h2>
-            <p className="text-sm text-gray-400">
-              {targetLanguage === 'auto' ? 'Auto-detect' : targetLanguage.toUpperCase()} → {sourceLanguage === 'auto' ? 'Auto-detect' : sourceLanguage.toUpperCase()}
-            </p>
-          </div>
-          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-            isConnected
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}>
-            {isConnected ? 'Connected' : 'Disconnected'}
+            {currentAccount && (
+              <p className="text-sm text-gray-400">
+                {targetLanguage === 'auto' ? 'Auto-detect' : targetLanguage.toUpperCase()} → {sourceLanguage === 'auto' ? 'Auto-detect' : sourceLanguage.toUpperCase()}
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -132,11 +132,7 @@ function App() {
       const accounts = await telegramAPI.getAccounts();
       setAccounts(accounts);
       
-      // Auto-select first connected account
-      const connectedAccount = accounts.find(acc => acc.isConnected);
-      if (connectedAccount && !currentAccount) {
-        setCurrentAccount(connectedAccount);
-      }
+      // Do not auto-select any account on initial load
     } catch (error) {
       console.error('Failed to load accounts:', error);
     }
