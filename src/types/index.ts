@@ -15,6 +15,7 @@ export interface TelegramAccount {
   createdAt: string;
   lastUsed?: string;
   isConnected: boolean;
+  unreadTotal?: number; // total unread across this account's conversations
 }
 
 export interface TelegramMessage {
@@ -42,6 +43,7 @@ export interface TelegramChat {
   type: 'private' | 'group' | 'supergroup' | 'channel';
   participantCount?: number;
   lastMessage?: TelegramMessage;
+  unreadCount?: number; // unread messages in this conversation
 }
 
 export interface TranslationResult {

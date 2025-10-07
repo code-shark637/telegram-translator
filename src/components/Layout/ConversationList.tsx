@@ -6,6 +6,7 @@ interface ConversationListProps {
   currentConversation: TelegramChat | null;
   onConversationSelect: (conversation: TelegramChat) => void;
   isConnected?: boolean;
+  unreadCounts: Record<number, number>; // conversationId -> count
 }
 
 export default function ConversationList({
@@ -13,6 +14,7 @@ export default function ConversationList({
   currentConversation,
   onConversationSelect,
   isConnected = false,
+  unreadCounts,
 }: ConversationListProps) {
   const getConversationIcon = (type: string) => {
     switch (type) {
@@ -94,9 +96,16 @@ export default function ConversationList({
                   </div>
                   
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs opacity-70 truncate">
-                      {conversation.lastMessage?.original_text || 'No messages yet'}
-                    </p>
+                    {conversation.lastMessage?.original_text && (
+                      <p className="text-xs opacity-70 truncate">
+                        {conversation.lastMessage.original_text}
+                      </p>
+                    )}
+                    {unreadCounts[conversation.id] > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px]">
+                        {unreadCounts[conversation.id]}
+                      </span>
+                    )}
                     {conversation.participantCount && conversation.participantCount > 1 && (
                       <span className="text-xs opacity-50">
                         {conversation.participantCount}

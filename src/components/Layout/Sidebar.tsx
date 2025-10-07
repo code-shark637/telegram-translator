@@ -1,4 +1,4 @@
-import React from 'react';
+ 
 import { Plus, Smartphone, Wifi, WifiOff, Pencil, Trash2 } from 'lucide-react';
 import type { TelegramAccount } from '../../types';
 
@@ -11,6 +11,7 @@ interface SidebarProps {
   onDisconnect: (account: TelegramAccount) => void;
   onEdit: (account: TelegramAccount) => void;
   onSoftDelete: (account: TelegramAccount) => void;
+  unreadCounts: Record<number, Record<number, number>>; // accountId -> { conversationId: count }
 }
 
 export default function Sidebar({
@@ -22,6 +23,7 @@ export default function Sidebar({
   onDisconnect,
   onEdit,
   onSoftDelete,
+  unreadCounts,
 }: SidebarProps) {
   return (
     <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
@@ -62,6 +64,15 @@ export default function Sidebar({
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-medium truncate">{account.displayName || account.accountName}</h4>
                     <div className="flex items-center space-x-2">
+                      {(() => {
+                        const map = unreadCounts[account.id] || {};
+                        const total = Object.values(map).reduce((s, n) => s + (n || 0), 0);
+                        return total > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/20 text-blue-300">
+                            {total}
+                          </span>
+                        ) : null;
+                      })()}
                       <button
                         onClick={(e) => { e.stopPropagation(); onEdit(account); }}
                         className="p-1 hover:bg-gray-600 rounded"
