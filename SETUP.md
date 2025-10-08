@@ -70,17 +70,6 @@ psql -d telegram_translator -h localhost -U postgres -f backend/database/schema.
 
 ## Step 5: Start the Application
 
-### Option 1: Start Both Frontend and Backend Together
-```bash
-npm run dev
-```
-
-This will start:
-- FastAPI backend on http://localhost:8000
-- React frontend on http://localhost:5173
-
-### Option 2: Start Separately
-
 Backend:
 ```bash
 npm run dev:backend
@@ -92,6 +81,10 @@ Frontend:
 ```bash
 npm run dev:client
 ```
+
+This will start:
+- FastAPI backend on http://localhost:8000
+- React frontend on http://localhost:5173
 
 ### Verify everything works
 
