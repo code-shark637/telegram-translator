@@ -80,7 +80,8 @@ npm run install:all
 
 2. Start development servers (FastAPI + Vite):
 ```bash
-npm run dev
+npm run dev:backend
+npm run dev:client
 ```
 
 The application will be available at:

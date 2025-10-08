@@ -37,6 +37,8 @@ function App() {
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<TelegramAccount | null>(null);
+  // unreadCounts[accountId][conversationId] = count
+  const [unreadCounts, setUnreadCounts] = useState<Record<number, Record<number, number>>>({});
 
   // Load accounts on mount
   useEffect(() => {
@@ -49,22 +51,58 @@ function App() {
   useEffect(() => {
     const unsubscribe = onMessage((data: any) => {
       if (data?.type === 'new_message' && data.message) {
-        // Only add messages for the currently selected account and conversation
-        if (currentAccount && currentConversation && data.account_id === currentAccount.id) {
-          if (data.message.conversation_id === currentConversation.id) {
+        const accountId = data.account_id as number;
+        const conversationId = data.message.conversation_id as number;
+
+        // Update central unreadCounts map first
+        setUnreadCounts(prev => {
+          const next = { ...prev };
+          const byConv = { ...(next[accountId] || {}) };
+          const isActiveConv = currentAccount && accountId === currentAccount.id && currentConversation && currentConversation.id === conversationId;
+          byConv[conversationId] = isActiveConv ? 0 : (byConv[conversationId] || 0) + 1;
+          next[accountId] = byConv;
+          return next;
+        });
+
+        // If message belongs to the currently selected account, update its conversation list (UI data)
+        if (currentAccount && accountId === currentAccount.id) {
+          setConversations(prev => {
+            let found = false;
+            const updated = prev.map(conv => {
+              if (conv.id === conversationId) {
+                found = true;
+                return {
+                  ...conv,
+                  lastMessage: data.message,
+                  lastMessageAt: data.message.created_at,
+                };
+              }
+              return conv;
+            });
+
+            // If conversation not found in list (e.g., new DM), create it
+            if (!found) {
+              updated.unshift({
+                id: conversationId,
+                title: data.message.peer_title || 'Unknown',
+                type: 'private',
+                lastMessage: data.message,
+              } as TelegramChat);
+            }
+
+            return updated;
+          });
+
+          // If current view is the same conversation, append message (unread already set to 0 above)
+          if (
+            currentConversation &&
+            conversationId === currentConversation.id
+          ) {
             setMessages(prev => [...prev, data.message]);
           }
-          
-          // Update the conversation list to show the new message
-          setConversations(prev => prev.map(conv => 
-            conv.id === data.message.conversation_id 
-              ? { 
-                  ...conv, 
-                  lastMessage: data.message,
-                  lastMessageAt: data.message.created_at 
-                }
-              : conv
-          ));
+        } else {
+          // If message is for a different account, do not change current conversations; only bump that account's total
+          // Sidebar will reflect totals derived from unreadCounts
         }
       }
       if (data?.type === 'account_connected' && typeof data.account_id === 'number') {
@@ -94,11 +132,7 @@ function App() {
       const accounts = await telegramAPI.getAccounts();
       setAccounts(accounts);
       
-      // Auto-select first connected account
-      const connectedAccount = accounts.find(acc => acc.isConnected);
-      if (connectedAccount && !currentAccount) {
-        setCurrentAccount(connectedAccount);
-      }
+      // Do not auto-select any account on initial load
     } catch (error) {
       console.error('Failed to load accounts:', error);
     }
@@ -137,6 +171,16 @@ function App() {
   const handleConversationSelect = (conversation: TelegramChat) => {
     setCurrentConversation(conversation);
     setMessages([]); // Clear messages when switching conversations
+    // Reset unread count in central map for this conversation
+    if (currentAccount) {
+      setUnreadCounts(prev => {
+        const next = { ...prev };
+        const byConv = { ...(next[currentAccount.id] || {}) };
+        if (byConv[conversation.id]) byConv[conversation.id] = 0;
+        next[currentAccount.id] = byConv;
+        return next;
+      });
+    }
     loadMessages(conversation.id); // Load messages for the selected conversation
   };
 
@@ -265,6 +309,7 @@ function App() {
           onDisconnect={handleDisconnectAccount}
           onEdit={handleEditAccount}
           onSoftDelete={handleSoftDelete}
+          unreadCounts={unreadCounts}
         />
         
         {currentAccount && (
@@ -273,6 +318,7 @@ function App() {
             currentConversation={currentConversation}
             onConversationSelect={handleConversationSelect}
             isConnected={currentAccount.isConnected}
+            unreadCounts={unreadCounts[currentAccount.id] || {}}
           />
         )}
         
