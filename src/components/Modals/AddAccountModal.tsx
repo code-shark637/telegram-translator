@@ -138,8 +138,9 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
                 <option value="de">German</option>
+                <option value="ja">Japanese</option>
                 <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
+                <option value="zh-cn">Chinese</option>
               </select>
             </div>
 
@@ -156,8 +157,9 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
                 <option value="de">German</option>
+                <option value="ja">Japanese</option>
                 <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
+                <option value="zh-cn">Chinese</option>
               </select>
             </div>
           </div>

@@ -102,8 +102,9 @@ export default function EditAccountModal({ isOpen, account, onClose, onSuccess }
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
                 <option value="de">German</option>
+                <option value="ja">Japanese</option>
                 <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
+                <option value="zh-cn">Chinese</option>
               </select>
             </div>
             <div>
@@ -117,8 +118,9 @@ export default function EditAccountModal({ isOpen, account, onClose, onSuccess }
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
                 <option value="de">German</option>
+                <option value="ja">Japanese</option>
                 <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
+                <option value="zh-cn">Chinese</option>
               </select>
             </div>
           </div>
