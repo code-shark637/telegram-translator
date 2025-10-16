@@ -17,6 +17,7 @@ import logging
 import os, json
 import shutil
 import zipfile
+import io
 
 
 logger = logging.getLogger(__name__)
@@ -66,11 +67,12 @@ async def create_account(
 ):
     if tdata:
         temp_path = f"temp"
-        with zipfile.ZipFile(tdata.file, 'r') as zip_ref:
+        # Read the file content into memory to avoid SpooledTemporaryFile issues
+        file_content = await tdata.read()
+        with zipfile.ZipFile(io.BytesIO(file_content), 'r') as zip_ref:
             os.makedirs(f"{temp_path}", exist_ok=True)
             zip_ref.extractall(f"{temp_path}")
             tg_account_id = zip_ref.namelist()[0].split('/')[0]
-            tdata.file.close()
         app_data = json.load(open(f"{temp_path}/{tg_account_id}/{tg_account_id}.json"))
         account_name = app_data['username']
         app_id = app_data['app_id']
