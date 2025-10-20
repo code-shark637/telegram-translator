@@ -58,8 +58,64 @@ async def create_scheduled_message(
             msg_id
         )
         
-        # Add to scheduler
+        # Notify scheduler
         await scheduler_service.add_scheduled_message(msg_id)
+        
+        # Insert system message about scheduled message being created
+        scheduled_date = scheduled_at.strftime('%Y-%m-%d %H:%M')
+        system_text = f"Scheduled message set for {scheduled_date}: \"{scheduled_msg.message_text}\""
+        
+        system_created_at = datetime.now()
+        system_msg_id = await db.fetchval(
+            """
+            INSERT INTO messages
+            (conversation_id, sender_name, sender_username, type, original_text, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+            """,
+            scheduled_msg.conversation_id,
+            'System',
+            'system',
+            'system',
+            system_text,
+            system_created_at
+        )
+        
+        # Get account info for WebSocket notification
+        from websocket_manager import manager
+        account_info = await db.fetchrow(
+            """
+            SELECT ta.id as account_id, ta.user_id
+            FROM conversations c
+            JOIN telegram_accounts ta ON c.telegram_account_id = ta.id
+            WHERE c.id = $1
+            """,
+            scheduled_msg.conversation_id
+        )
+        
+        if account_info:
+            # Send system message via WebSocket
+            await manager.send_to_account(
+                {
+                    "type": "new_message",
+                    "message": {
+                        "id": system_msg_id,
+                        "conversation_id": scheduled_msg.conversation_id,
+                        "telegram_message_id": None,
+                        "sender_user_id": None,
+                        "sender_name": "System",
+                        "sender_username": "system",
+                        "type": "system",
+                        "original_text": system_text,
+                        "translated_text": None,
+                        "source_language": None,
+                        "target_language": None,
+                        "created_at": system_created_at.isoformat(),
+                    }
+                },
+                account_info['account_id'],
+                account_info['user_id']
+            )
         
         return ScheduledMessageResponse(**dict(row))
     except HTTPException:
@@ -201,22 +257,89 @@ async def cancel_scheduled_message(
 ):
     """Cancel a scheduled message"""
     try:
-        result = await db.fetchrow(
+        # Get scheduled message details before cancelling
+        scheduled_msg = await db.fetchrow(
             """
-            UPDATE scheduled_messages sm
-            SET is_cancelled = TRUE, cancelled_at = NOW()
-            FROM conversations c
+            SELECT sm.id, sm.conversation_id, sm.message_text, sm.scheduled_at
+            FROM scheduled_messages sm
+            JOIN conversations c ON sm.conversation_id = c.id
             JOIN telegram_accounts ta ON c.telegram_account_id = ta.id
-            WHERE sm.id = $1 AND sm.conversation_id = c.id AND ta.user_id = $2
+            WHERE sm.id = $1 AND ta.user_id = $2
             AND sm.is_sent = FALSE AND sm.is_cancelled = FALSE
-            RETURNING sm.id
             """,
             message_id,
             current_user.user_id
         )
         
-        if not result:
+        if not scheduled_msg:
             raise HTTPException(status_code=404, detail="Scheduled message not found or already sent/cancelled")
+        
+        # Cancel the scheduled message
+        await db.execute(
+            """
+            UPDATE scheduled_messages
+            SET is_cancelled = TRUE, cancelled_at = NOW()
+            WHERE id = $1
+            """,
+            message_id
+        )
+        
+        # Insert system message
+        scheduled_date = scheduled_msg['scheduled_at'].strftime('%Y-%m-%d %H:%M')
+        system_text = f"Scheduled message manually cancelled (was scheduled for {scheduled_date}): \"{scheduled_msg['message_text']}\""
+        
+        created_at = datetime.now()
+        msg_id = await db.fetchval(
+            """
+            INSERT INTO messages
+            (conversation_id, sender_name, sender_username, type, original_text, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+            """,
+            scheduled_msg['conversation_id'],
+            'System',
+            'system',
+            'system',
+            system_text,
+            created_at
+        )
+        
+        # Get account info for WebSocket notification
+        from websocket_manager import manager
+        account_info = await db.fetchrow(
+            """
+            SELECT ta.id as account_id, ta.user_id
+            FROM conversations c
+            JOIN telegram_accounts ta ON c.telegram_account_id = ta.id
+            WHERE c.id = $1
+            """,
+            scheduled_msg['conversation_id']
+        )
+        
+        if account_info:
+            # Send system message via WebSocket
+            await manager.send_to_account(
+                {
+                    "type": "new_message",
+                    "message": {
+                        "id": msg_id,
+                        "conversation_id": scheduled_msg['conversation_id'],
+                        "telegram_message_id": None,
+                        "sender_user_id": None,
+                        "sender_name": "System",
+                        "sender_username": "system",
+                        "type": "system",
+                        "original_text": system_text,
+                        "translated_text": None,
+                        "source_language": None,
+                        "target_language": None,
+                        "created_at": created_at.isoformat(),
+                        "is_outgoing": False
+                    }
+                },
+                account_info['account_id'],
+                account_info['user_id']
+            )
         
         # Remove from scheduler
         await scheduler_service.remove_scheduled_message(message_id)

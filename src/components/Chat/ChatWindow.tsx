@@ -53,6 +53,22 @@ export default function ChatWindow({
     }
   }, [conversationId]);
 
+  // Listen for scheduled message sent events
+  useEffect(() => {
+    // This would be handled by WebSocket in App.tsx
+    // When a scheduled_message_sent event is received, reload scheduled messages
+    const handleScheduledMessageSent = () => {
+      if (conversationId) {
+        loadScheduledMessages();
+      }
+    };
+    
+    // You can add event listener here if needed
+    return () => {
+      // Cleanup
+    };
+  }, [conversationId]);
+
   const loadTemplates = async () => {
     try {
       const data = await templatesAPI.getTemplates();
@@ -82,6 +98,10 @@ export default function ChatWindow({
     try {
       await scheduledMessagesAPI.cancelScheduledMessage(messageId);
       setScheduledMessages(scheduledMessages.filter(m => m.id !== messageId));
+      // Reload messages to show the system message
+      // The parent component should handle this, but we can trigger a refresh
+      // by calling the onSendMessage callback with empty string (no-op) or
+      // we can emit an event. For now, the WebSocket will handle the update.
     } catch (err) {
       console.error('Failed to cancel scheduled message:', err);
     }
@@ -129,51 +149,63 @@ export default function ChatWindow({
       {/* Chat header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Translation Chat</h2>
-            {currentAccount && (
-              <p className="text-sm text-gray-400">
-                {targetLanguage === 'auto' ? 'Auto-detect' : targetLanguage.toUpperCase()} → {sourceLanguage === 'auto' ? 'Auto-detect' : sourceLanguage.toUpperCase()}
-              </p>
-            )}
+          <div className="flex-1">
+            <div className="flex items-center space-x-3">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Translation Chat</h2>
+                {currentAccount && (
+                  <p className="text-sm text-gray-400">
+                    {targetLanguage === 'auto' ? 'Auto-detect' : targetLanguage.toUpperCase()} → {sourceLanguage === 'auto' ? 'Auto-detect' : sourceLanguage.toUpperCase()}
+                  </p>
+                )}
+              </div>
+              {/* Scheduled Messages Badge */}
+              {scheduledMessages.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  {scheduledMessages.map((sm) => {
+                    const scheduledDate = new Date(sm.scheduled_at);
+                    const formattedDate = scheduledDate.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                      timeZoneName: 'short'
+                    });
+                    return (
+                      <div
+                        key={sm.id}
+                        className="flex items-center space-x-2 px-3 py-2 bg-blue-500/20 border border-blue-500/40 rounded-lg"
+                      >
+                        <Clock className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-blue-300 font-medium">
+                            {formattedDate}
+                          </span>
+                          <span className="text-xs text-gray-400 truncate max-w-xs">
+                            {sm.message_text}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleCancelScheduledMessage(sm.id)}
+                          className="text-red-400 hover:text-red-300 text-xs ml-2 flex-shrink-0"
+                          title="Cancel scheduled message"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* Scheduled Messages Notice */}
-        {scheduledMessages.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {scheduledMessages.map((sm) => {
-              const daysUntil = Math.ceil(
-                (new Date(sm.scheduled_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-              );
-              return (
-                <div
-                  key={sm.id}
-                  className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start justify-between"
-                >
-                  <div className="flex items-start space-x-3 flex-1">
-                    <Clock className="w-5 h-5 text-blue-400 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-blue-300 font-medium">
-                        Scheduled message will be sent in {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">{sm.message_text}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleCancelScheduledMessage(sm.id)}
-                    className="text-red-400 hover:text-red-300 text-xs"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
         {messages.length === 0 ? (
           <div className="text-center py-12">
             <Languages className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -191,6 +223,22 @@ export default function ChatWindow({
           </div>
         ) : (
           sortedMessages.map((message) => {
+            // System messages (scheduled message cancellations)
+            if (message.type === 'system') {
+              return (
+                <div key={message.id} className="flex justify-center mb-4">
+                  <div className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg max-w-2xl">
+                    <p className="text-xs text-yellow-300 text-center">
+                      {message.original_text}
+                    </p>
+                    <p className="text-xs text-gray-500 text-center mt-1">
+                      {new Date(message.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
             const isOutgoing = isMessageOutgoing(message);
             
             return (

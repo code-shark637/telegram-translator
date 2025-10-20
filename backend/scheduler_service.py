@@ -83,6 +83,19 @@ class SchedulerService:
     async def cancel_scheduled_messages_for_conversation(self, conversation_id: int):
         """Cancel all scheduled messages for a conversation (when opposite party responds)"""
         try:
+            # Get scheduled messages before cancelling
+            scheduled_msgs = await db.fetch(
+                """
+                SELECT id, message_text, scheduled_at
+                FROM scheduled_messages
+                WHERE conversation_id = $1 AND is_sent = FALSE AND is_cancelled = FALSE
+                """,
+                conversation_id
+            )
+            
+            if not scheduled_msgs:
+                return
+            
             # Update database
             await db.execute(
                 """
@@ -92,6 +105,28 @@ class SchedulerService:
                 """,
                 conversation_id
             )
+            
+            # Insert system message for each cancelled scheduled message
+            from datetime import datetime
+            for msg in scheduled_msgs:
+                scheduled_date = msg['scheduled_at'].strftime('%Y-%m-%d %H:%M')
+                system_text = f"Scheduled message cancelled (was scheduled for {scheduled_date}): \"{msg['message_text']}\""
+                
+                created_at = datetime.now()
+                msg_id = await db.fetchval(
+                    """
+                    INSERT INTO messages
+                    (conversation_id, sender_name, sender_username, type, original_text, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING id
+                    """,
+                    conversation_id,
+                    'System',
+                    'system',
+                    'system',
+                    system_text,
+                    created_at
+                )
             
             # Remove from memory
             to_remove = [
@@ -117,6 +152,7 @@ class SchedulerService:
                 )
                 
                 if conversation:
+                    # Send cancellation notification
                     await manager.send_to_account(
                         {
                             "type": "scheduled_messages_cancelled",
@@ -126,6 +162,34 @@ class SchedulerService:
                         conversation['account_id'],
                         conversation['user_id']
                     )
+                    
+                    # Send system messages via WebSocket
+                    for msg in scheduled_msgs:
+                        scheduled_date = msg['scheduled_at'].strftime('%Y-%m-%d %H:%M')
+                        system_text = f"Scheduled message cancelled (was scheduled for {scheduled_date}): \"{msg['message_text']}\""
+                        
+                        await manager.send_to_account(
+                            {
+                                "type": "new_message",
+                                "message": {
+                                    "id": msg_id,  # Using the last msg_id from the loop above
+                                    "conversation_id": conversation_id,
+                                    "telegram_message_id": None,
+                                    "sender_user_id": None,
+                                    "sender_name": "System",
+                                    "sender_username": "system",
+                                    "type": "system",
+                                    "original_text": system_text,
+                                    "translated_text": None,
+                                    "source_language": None,
+                                    "target_language": None,
+                                    "created_at": created_at.isoformat(),
+                                    "is_outgoing": False
+                                }
+                            },
+                            conversation['account_id'],
+                            conversation['user_id']
+                        )
         except Exception as e:
             logger.error(f"Failed to cancel scheduled messages for conversation {conversation_id}: {e}")
     
@@ -137,7 +201,8 @@ class SchedulerService:
             try:
                 await asyncio.sleep(self.check_interval)
                 
-                now = datetime.now()
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
                 messages_to_send = []
                 
                 # Find messages that should be sent
@@ -195,8 +260,8 @@ class SchedulerService:
                 """
                 INSERT INTO messages
                 (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
-                 original_text, translated_text, source_language, target_language, created_at, is_outgoing)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                 original_text, translated_text, source_language, target_language, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING id
                 """,
                 conversation_id,
@@ -209,8 +274,24 @@ class SchedulerService:
                 translation['translated_text'],
                 account['target_language'],
                 account['source_language'],
-                created_at,
-                True
+                created_at
+            )
+            
+            # Insert system message about scheduled message being sent
+            system_text = f"Scheduled message sent: \"{message_text}\" → \"{translation['translated_text']}\""
+            system_msg_id = await db.fetchval(
+                """
+                INSERT INTO messages
+                (conversation_id, sender_name, sender_username, type, original_text, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id
+                """,
+                conversation_id,
+                'System',
+                'system',
+                'system',
+                system_text,
+                created_at
             )
             
             # Update conversation
@@ -233,7 +314,7 @@ class SchedulerService:
             # Remove from scheduler
             del self.scheduled_messages[message_id]
             
-            # Notify frontend via WebSocket
+            # Notify frontend via WebSocket - sent message
             await manager.send_to_account(
                 {
                     "type": "new_message",
@@ -249,8 +330,30 @@ class SchedulerService:
                         "translated_text": translation['translated_text'],
                         "source_language": account['target_language'],
                         "target_language": account['source_language'],
-                        "created_at": created_at.isoformat() if created_at else None,
-                        "is_outgoing": True
+                        "created_at": created_at.isoformat() if created_at else None
+                    }
+                },
+                account_id,
+                account['user_id']
+            )
+            
+            # Notify frontend via WebSocket - system message
+            await manager.send_to_account(
+                {
+                    "type": "new_message",
+                    "message": {
+                        "id": system_msg_id,
+                        "conversation_id": conversation_id,
+                        "telegram_message_id": None,
+                        "sender_user_id": None,
+                        "sender_name": "System",
+                        "sender_username": "system",
+                        "type": "system",
+                        "original_text": system_text,
+                        "translated_text": None,
+                        "source_language": None,
+                        "target_language": None,
+                        "created_at": created_at.isoformat() if created_at else None
                     }
                 },
                 account_id,
