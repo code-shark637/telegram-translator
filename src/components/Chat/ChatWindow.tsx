@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Languages } from 'lucide-react';
-import type { TelegramMessage, TelegramChat, TelegramAccount } from '../../types';
+import { Send, Languages, Clock, FileText, Copy } from 'lucide-react';
+import { templatesAPI, scheduledMessagesAPI } from '../../services/api';
+import type { TelegramMessage, TelegramChat, TelegramAccount, MessageTemplate, ScheduledMessage } from '../../types';
+import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
+import MessageTemplatesModal from '../Modals/MessageTemplatesModal';
 
 interface ChatWindowProps {
   messages: TelegramMessage[];
@@ -10,6 +13,7 @@ interface ChatWindowProps {
   sourceLanguage: string;
   targetLanguage: string;
   onSendMessage: (text: string) => Promise<void>;
+  conversationId?: number;
 }
 
 export default function ChatWindow({
@@ -20,9 +24,15 @@ export default function ChatWindow({
   sourceLanguage,
   targetLanguage,
   onSendMessage,
+  conversationId,
 }: ChatWindowProps) {
   const [newMessage, setNewMessage] = useState('');
   const [translating, setTranslating] = useState(false);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -32,6 +42,50 @@ export default function ChatWindow({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  useEffect(() => {
+    if (conversationId) {
+      loadScheduledMessages();
+    }
+  }, [conversationId]);
+
+  const loadTemplates = async () => {
+    try {
+      const data = await templatesAPI.getTemplates();
+      setTemplates(data);
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+    }
+  };
+
+  const loadScheduledMessages = async () => {
+    if (!conversationId) return;
+    try {
+      const data = await scheduledMessagesAPI.getScheduledMessagesByConversation(conversationId);
+      setScheduledMessages(data);
+    } catch (err) {
+      console.error('Failed to load scheduled messages:', err);
+    }
+  };
+
+  const handleTemplateSelect = (template: MessageTemplate) => {
+    setNewMessage(template.content);
+    setShowTemplates(false);
+  };
+
+  const handleCancelScheduledMessage = async (messageId: number) => {
+    if (!confirm('Cancel this scheduled message?')) return;
+    try {
+      await scheduledMessagesAPI.cancelScheduledMessage(messageId);
+      setScheduledMessages(scheduledMessages.filter(m => m.id !== messageId));
+    } catch (err) {
+      console.error('Failed to cancel scheduled message:', err);
+    }
+  };
 
   // Sort messages by timestamp
   const sortedMessages = useMemo(() => {
@@ -88,6 +142,38 @@ export default function ChatWindow({
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-6">
+        {/* Scheduled Messages Notice */}
+        {scheduledMessages.length > 0 && (
+          <div className="mb-4 space-y-2">
+            {scheduledMessages.map((sm) => {
+              const daysUntil = Math.ceil(
+                (new Date(sm.scheduled_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+              );
+              return (
+                <div
+                  key={sm.id}
+                  className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start justify-between"
+                >
+                  <div className="flex items-start space-x-3 flex-1">
+                    <Clock className="w-5 h-5 text-blue-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-300 font-medium">
+                        Scheduled message will be sent in {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{sm.message_text}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCancelScheduledMessage(sm.id)}
+                    className="text-red-400 hover:text-red-300 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="text-center py-12">
             <Languages className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -184,6 +270,53 @@ export default function ChatWindow({
 
       {/* Message input */}
       <div className="bg-gray-800 border-t border-gray-700 p-6">
+        {/* Template Selector */}
+        {showTemplates && templates.length > 0 && (
+          <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600 max-h-48 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-300">Select Template</span>
+              <button
+                onClick={() => setShowTemplates(false)}
+                className="text-gray-400 hover:text-white text-xs"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-2">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => handleTemplateSelect(template)}
+                  className="w-full text-left p-2 bg-gray-600 hover:bg-gray-500 rounded transition-colors"
+                >
+                  <div className="text-sm font-medium text-white">{template.name}</div>
+                  <div className="text-xs text-gray-400 truncate">{template.content}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center space-x-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setShowTemplates(!showTemplates)}
+            disabled={!isConnected || !currentConversation}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2 text-sm"
+          >
+            <Copy className="w-4 h-4" />
+            <span>Templates</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowTemplatesModal(true)}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center space-x-2 text-sm"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Manage</span>
+          </button>
+        </div>
+
         <form onSubmit={handleSendMessage} className="flex space-x-4">
           <div className="flex-1 relative">
             <input
@@ -213,11 +346,35 @@ export default function ChatWindow({
           >
             <Send className="w-4 h-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => setShowScheduleModal(true)}
+            disabled={!isConnected || !currentConversation}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+            title="Schedule Message"
+          >
+            <Clock className="w-4 h-4" />
+          </button>
         </form>
         <p className="text-xs text-gray-500 mt-2">
           Your message will be automatically translated and sent in {sourceLanguage === 'auto' ? 'detected language' : sourceLanguage.toUpperCase()}
         </p>
       </div>
+
+      {/* Modals */}
+      <ScheduleMessageModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        conversationId={conversationId || null}
+        onScheduled={loadScheduledMessages}
+      />
+      <MessageTemplatesModal
+        isOpen={showTemplatesModal}
+        onClose={() => {
+          setShowTemplatesModal(false);
+          loadTemplates();
+        }}
+      />
     </div>
   );
 }

@@ -8,10 +8,13 @@ from database import db
 from telethon_service import telethon_service
 from websocket_manager import manager
 from translation_service import translation_service
+from scheduler_service import scheduler_service
 from app.features.auth.routes import router as auth_router
 from app.features.telegram.routes import router as telegram_router
 from app.features.messages.routes import router as messages_router
 from app.features.translation.routes import router as translation_router
+from app.features.templates.routes import router as templates_router
+from app.features.scheduled.routes import router as scheduled_router
 from auth import get_current_user
 from jose import jwt, JWTError
 
@@ -98,6 +101,10 @@ async def lifespan(app: FastAPI):
                     created_at,
                     conversation_id
                 )
+                
+                # Cancel scheduled messages if this is an incoming message
+                if not message_data.get('is_outgoing', False):
+                    await scheduler_service.cancel_scheduled_messages_for_conversation(conversation_id)
 
                 await manager.send_to_account(
                     {
@@ -127,12 +134,16 @@ async def lifespan(app: FastAPI):
             logger.error(f"Error handling new message: {e}")
 
     telethon_service.add_message_handler(handle_new_message)
+    
+    # Start scheduler service
+    await scheduler_service.start()
 
     logger.info("Application startup complete")
 
     yield
 
     logger.info("Shutting down application...")
+    await scheduler_service.stop()
     await telethon_service.disconnect_all()
     await db.disconnect()
     logger.info("Application shutdown complete")
@@ -156,6 +167,8 @@ app.include_router(auth_router)
 app.include_router(telegram_router)
 app.include_router(translation_router)
 app.include_router(messages_router)
+app.include_router(templates_router)
+app.include_router(scheduled_router)
 
 @app.get("/")
 async def root():

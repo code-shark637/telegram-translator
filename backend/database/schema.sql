@@ -76,3 +76,30 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+
+-- Message Templates
+CREATE TABLE IF NOT EXISTS message_templates (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_message_templates_user ON message_templates(user_id);
+
+-- Scheduled Messages
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id BIGSERIAL PRIMARY KEY,
+  conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  message_text TEXT NOT NULL,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_sent BOOLEAN NOT NULL DEFAULT FALSE,
+  is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+  sent_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_conversation ON scheduled_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_scheduled_at ON scheduled_messages(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_status ON scheduled_messages(is_sent, is_cancelled, scheduled_at);

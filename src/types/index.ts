@@ -74,3 +74,24 @@ export interface AppState {
   messages: TelegramMessage[];
   isConnected: boolean;
 }
+
+export interface MessageTemplate {
+  id: number;
+  user_id: number;
+  name: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduledMessage {
+  id: number;
+  conversation_id: number;
+  message_text: string;
+  scheduled_at: string;
+  created_at: string;
+  is_sent: boolean;
+  is_cancelled: boolean;
+  sent_at?: string;
+  cancelled_at?: string;
+}

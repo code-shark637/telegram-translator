@@ -330,6 +330,7 @@ function App() {
           sourceLanguage={currentAccount?.sourceLanguage || 'auto'}
           targetLanguage={currentAccount?.targetLanguage || 'en'}
           onSendMessage={handleSendMessage}
+          conversationId={currentConversation?.id}
         />
       </div>
 

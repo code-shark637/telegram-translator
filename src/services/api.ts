@@ -1,6 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import type { User, TelegramAccount, TranslationResult, Language } from '../types';
+import type { User, TelegramAccount, TranslationResult, Language, MessageTemplate, ScheduledMessage } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -198,5 +198,63 @@ export const healthAPI = {
   check: async (): Promise<{ status: string; database: string }> => {
     const response = await api.get('/health');
     return response.data;
+  },
+};
+
+// Message Templates API
+export const templatesAPI = {
+  getTemplates: async (): Promise<MessageTemplate[]> => {
+    const response = await api.get('/templates');
+    return response.data;
+  },
+
+  getTemplate: async (templateId: number): Promise<MessageTemplate> => {
+    const response = await api.get(`/templates/${templateId}`);
+    return response.data;
+  },
+
+  createTemplate: async (name: string, content: string): Promise<MessageTemplate> => {
+    const response = await api.post('/templates', { name, content });
+    return response.data;
+  },
+
+  updateTemplate: async (templateId: number, data: { name?: string; content?: string }): Promise<MessageTemplate> => {
+    const response = await api.put(`/templates/${templateId}`, data);
+    return response.data;
+  },
+
+  deleteTemplate: async (templateId: number): Promise<void> => {
+    await api.delete(`/templates/${templateId}`);
+  },
+};
+
+// Scheduled Messages API
+export const scheduledMessagesAPI = {
+  getScheduledMessages: async (): Promise<ScheduledMessage[]> => {
+    const response = await api.get('/scheduled-messages');
+    return response.data;
+  },
+
+  getScheduledMessagesByConversation: async (conversationId: number): Promise<ScheduledMessage[]> => {
+    const response = await api.get(`/scheduled-messages/conversation/${conversationId}`);
+    return response.data;
+  },
+
+  createScheduledMessage: async (conversationId: number, messageText: string, daysDelay: number): Promise<ScheduledMessage> => {
+    const response = await api.post('/scheduled-messages', {
+      conversation_id: conversationId,
+      message_text: messageText,
+      days_delay: daysDelay,
+    });
+    return response.data;
+  },
+
+  updateScheduledMessage: async (messageId: number, data: { message_text?: string; days_delay?: number }): Promise<ScheduledMessage> => {
+    const response = await api.put(`/scheduled-messages/${messageId}`, data);
+    return response.data;
+  },
+
+  cancelScheduledMessage: async (messageId: number): Promise<void> => {
+    await api.delete(`/scheduled-messages/${messageId}`);
   },
 };

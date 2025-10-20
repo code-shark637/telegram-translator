@@ -112,3 +112,41 @@ class TdataUpload(BaseModel):
     account_name: str
     source_language: str = "auto"
     target_language: str = "en"
+
+# Message Templates
+class MessageTemplateCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    content: str = Field(..., min_length=1)
+
+class MessageTemplateUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    content: Optional[str] = Field(None, min_length=1)
+
+class MessageTemplateResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+# Scheduled Messages
+class ScheduledMessageCreate(BaseModel):
+    conversation_id: int
+    message_text: str = Field(..., min_length=1)
+    days_delay: int = Field(..., ge=1)  # Number of days to wait before sending
+
+class ScheduledMessageUpdate(BaseModel):
+    message_text: Optional[str] = Field(None, min_length=1)
+    days_delay: Optional[int] = Field(None, ge=1)
+
+class ScheduledMessageResponse(BaseModel):
+    id: int
+    conversation_id: int
+    message_text: str
+    scheduled_at: datetime
+    created_at: datetime
+    is_sent: bool
+    is_cancelled: bool
+    sent_at: Optional[datetime]
+    cancelled_at: Optional[datetime]
