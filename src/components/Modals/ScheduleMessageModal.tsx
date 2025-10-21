@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Clock, Send } from 'lucide-react';
 import { scheduledMessagesAPI } from '../../services/api';
 
@@ -6,6 +6,7 @@ interface ScheduleMessageModalProps {
   isOpen: boolean;
   onClose: () => void;
   conversationId: number | null;
+  messageText: string;
   onScheduled: () => void;
 }
 
@@ -13,9 +14,9 @@ export default function ScheduleMessageModal({
   isOpen,
   onClose,
   conversationId,
+  messageText,
   onScheduled,
 }: ScheduleMessageModalProps) {
-  const [messageText, setMessageText] = useState('');
   const [daysDelay, setDaysDelay] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,6 @@ export default function ScheduleMessageModal({
       setLoading(true);
       setError(null);
       await scheduledMessagesAPI.createScheduledMessage(conversationId, messageText, daysDelay);
-      setMessageText('');
       setDaysDelay(1);
       onScheduled();
       onClose();
@@ -53,7 +53,6 @@ export default function ScheduleMessageModal({
   };
 
   const handleClose = () => {
-    setMessageText('');
     setDaysDelay(1);
     setError(null);
     onClose();
@@ -87,18 +86,14 @@ export default function ScheduleMessageModal({
           )}
 
           <div className="space-y-4">
-            {/* Message Text */}
+            {/* Message Preview */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Message Text
+                Message to Schedule
               </label>
-              <textarea
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Enter your message..."
-                rows={4}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              />
+              <div className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-300 min-h-[80px]">
+                {messageText || <span className="text-gray-500">No message entered</span>}
+              </div>
             </div>
 
             {/* Days Delay */}

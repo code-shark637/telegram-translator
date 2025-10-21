@@ -53,22 +53,6 @@ export default function ChatWindow({
     }
   }, [conversationId]);
 
-  // Listen for scheduled message sent events
-  useEffect(() => {
-    // This would be handled by WebSocket in App.tsx
-    // When a scheduled_message_sent event is received, reload scheduled messages
-    const handleScheduledMessageSent = () => {
-      if (conversationId) {
-        loadScheduledMessages();
-      }
-    };
-    
-    // You can add event listener here if needed
-    return () => {
-      // Cleanup
-    };
-  }, [conversationId]);
-
   const loadTemplates = async () => {
     try {
       const data = await templatesAPI.getTemplates();
@@ -397,7 +381,7 @@ export default function ChatWindow({
           <button
             type="button"
             onClick={() => setShowScheduleModal(true)}
-            disabled={!isConnected || !currentConversation}
+            disabled={!newMessage.trim() || !isConnected || !currentConversation}
             className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
             title="Schedule Message"
           >
@@ -414,6 +398,7 @@ export default function ChatWindow({
         isOpen={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
         conversationId={conversationId || null}
+        messageText={newMessage}
         onScheduled={loadScheduledMessages}
       />
       <MessageTemplatesModal
