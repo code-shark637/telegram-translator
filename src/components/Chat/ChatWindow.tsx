@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Languages, Clock, FileText, Copy } from 'lucide-react';
+import { Send, Languages, Clock, FileText, Copy, User } from 'lucide-react';
 import { templatesAPI, scheduledMessagesAPI } from '../../services/api';
 import type { TelegramMessage, TelegramChat, TelegramAccount, MessageTemplate, ScheduledMessage } from '../../types';
 import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
 import MessageTemplatesModal from '../Modals/MessageTemplatesModal';
+import ContactInfoModal from '../Modals/ContactInfoModal';
 
 interface ChatWindowProps {
   messages: TelegramMessage[];
@@ -33,6 +34,8 @@ export default function ChatWindow({
   const [showTemplates, setShowTemplates] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactSaveAlert, setContactSaveAlert] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -117,6 +120,11 @@ export default function ChatWindow({
     }
   };
 
+  const handleContactSaved = () => {
+    setContactSaveAlert(true);
+    setTimeout(() => setContactSaveAlert(false), 3000);
+  };
+
   // Sort messages by timestamp
   const sortedMessages = useMemo(() => {
     return [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -156,6 +164,18 @@ export default function ChatWindow({
 
   return (
     <div className="flex-1 flex flex-col bg-gray-900">
+      {/* Contact Save Alert */}
+      {contactSaveAlert && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+          <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">Contact information saved successfully!</span>
+          </div>
+        </div>
+      )}
+
       {/* Chat header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -211,6 +231,17 @@ export default function ChatWindow({
               )}
             </div>
           </div>
+          {/* Contact Info Button */}
+          {currentConversation && (
+            <button
+              onClick={() => setShowContactModal(true)}
+              className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center space-x-2 text-sm"
+              title="Contact CRM Info"
+            >
+              <User className="w-4 h-4" />
+              <span>CRM</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -433,6 +464,12 @@ export default function ChatWindow({
           setShowTemplatesModal(false);
           loadTemplates();
         }}
+      />
+      <ContactInfoModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        conversationId={conversationId || null}
+        onSaved={handleContactSaved}
       />
     </div>
   );

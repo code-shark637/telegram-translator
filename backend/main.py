@@ -15,6 +15,7 @@ from app.features.messages.routes import router as messages_router
 from app.features.translation.routes import router as translation_router
 from app.features.templates.routes import router as templates_router
 from app.features.scheduled.routes import router as scheduled_router
+from app.features.contacts.routes import router as contacts_router
 from auth import get_current_user
 from jose import jwt, JWTError
 
@@ -169,6 +170,7 @@ app.include_router(translation_router)
 app.include_router(messages_router)
 app.include_router(templates_router)
 app.include_router(scheduled_router)
+app.include_router(contacts_router, prefix="/api/contacts", tags=["contacts"])
 
 @app.get("/")
 async def root():

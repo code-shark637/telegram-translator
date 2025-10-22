@@ -1,6 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import type { User, TelegramAccount, TranslationResult, Language, MessageTemplate, ScheduledMessage } from '../types';
+import type { User, TelegramAccount, TranslationResult, Language, MessageTemplate, ScheduledMessage, ContactInfo } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -256,5 +256,27 @@ export const scheduledMessagesAPI = {
 
   cancelScheduledMessage: async (messageId: number): Promise<void> => {
     await api.delete(`/scheduled-messages/${messageId}`);
+  },
+};
+
+// Contact CRM API
+export const contactsAPI = {
+  getContactInfo: async (conversationId: number): Promise<ContactInfo | null> => {
+    const response = await api.get(`/contacts/conversation/${conversationId}`);
+    return response.data;
+  },
+
+  createContactInfo: async (data: Partial<ContactInfo>): Promise<ContactInfo> => {
+    const response = await api.post('/contacts', data);
+    return response.data;
+  },
+
+  updateContactInfo: async (contactId: number, data: Partial<ContactInfo>): Promise<ContactInfo> => {
+    const response = await api.put(`/contacts/${contactId}`, data);
+    return response.data;
+  },
+
+  deleteContactInfo: async (contactId: number): Promise<void> => {
+    await api.delete(`/contacts/${contactId}`);
   },
 };

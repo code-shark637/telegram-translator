@@ -95,3 +95,25 @@ export interface ScheduledMessage {
   sent_at?: string;
   cancelled_at?: string;
 }
+
+export interface ContactInfo {
+  id: number;
+  conversation_id: number;
+  name?: string;
+  address?: string;
+  telephone?: string;
+  telegram_id?: string;
+  telegram_id2?: string;
+  signal_id?: string;
+  signal_id2?: string;
+  product_interest?: string;
+  sales_volume?: string;
+  ready_for_sample: boolean;
+  sample_recipient_info?: string;
+  sample_feedback?: string;
+  payment_method?: string;
+  delivery_method?: string;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+}

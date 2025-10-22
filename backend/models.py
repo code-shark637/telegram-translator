@@ -148,5 +148,60 @@ class ScheduledMessageResponse(BaseModel):
     created_at: datetime
     is_sent: bool
     is_cancelled: bool
-    sent_at: Optional[datetime]
-    cancelled_at: Optional[datetime]
+
+# Contact CRM Information
+class ContactInfoCreate(BaseModel):
+    conversation_id: int
+    name: Optional[str] = None
+    address: Optional[str] = None
+    telephone: Optional[str] = None
+    telegram_id: Optional[str] = None
+    telegram_id2: Optional[str] = None
+    signal_id: Optional[str] = None
+    signal_id2: Optional[str] = None
+    product_interest: Optional[str] = None
+    sales_volume: Optional[str] = None
+    ready_for_sample: Optional[bool] = False
+    sample_recipient_info: Optional[str] = None
+    sample_feedback: Optional[str] = None
+    payment_method: Optional[str] = None
+    delivery_method: Optional[str] = None
+    note: Optional[str] = None
+
+class ContactInfoUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    telephone: Optional[str] = None
+    telegram_id: Optional[str] = None
+    telegram_id2: Optional[str] = None
+    signal_id: Optional[str] = None
+    signal_id2: Optional[str] = None
+    product_interest: Optional[str] = None
+    sales_volume: Optional[str] = None
+    ready_for_sample: Optional[bool] = None
+    sample_recipient_info: Optional[str] = None
+    sample_feedback: Optional[str] = None
+    payment_method: Optional[str] = None
+    delivery_method: Optional[str] = None
+    note: Optional[str] = None
+
+class ContactInfoResponse(BaseModel):
+    id: int
+    conversation_id: int
+    name: Optional[str]
+    address: Optional[str]
+    telephone: Optional[str]
+    telegram_id: Optional[str]
+    telegram_id2: Optional[str]
+    signal_id: Optional[str]
+    signal_id2: Optional[str]
+    product_interest: Optional[str]
+    sales_volume: Optional[str]
+    ready_for_sample: bool
+    sample_recipient_info: Optional[str]
+    sample_feedback: Optional[str]
+    payment_method: Optional[str]
+    delivery_method: Optional[str]
+    note: Optional[str]
+    created_at: datetime
+    updated_at: datetime
