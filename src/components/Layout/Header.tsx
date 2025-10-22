@@ -1,13 +1,9 @@
 import React from 'react';
-import { MessageCircle, Settings, LogOut, User } from 'lucide-react';
+import { MessageCircle, LogOut, User } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
-interface HeaderProps {
-  onSettingsClick: () => void;
-}
-
-export default function Header({ onSettingsClick }: HeaderProps) {
+export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -24,14 +20,6 @@ export default function Header({ onSettingsClick }: HeaderProps) {
             <User className="w-4 h-4" />
             <span className="text-sm">{user?.username}</span>
           </div>
-          
-          <button
-            onClick={onSettingsClick}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title="Settings"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
           
           <button
             onClick={() => {

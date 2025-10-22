@@ -76,3 +76,54 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+
+-- Message Templates
+CREATE TABLE IF NOT EXISTS message_templates (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_message_templates_user ON message_templates(user_id);
+
+-- Scheduled Messages
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id BIGSERIAL PRIMARY KEY,
+  conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  message_text TEXT NOT NULL,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_sent BOOLEAN NOT NULL DEFAULT FALSE,
+  is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+  sent_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_conversation ON scheduled_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_scheduled_at ON scheduled_messages(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_status ON scheduled_messages(is_sent, is_cancelled, scheduled_at);
+
+-- Contact CRM Information
+CREATE TABLE IF NOT EXISTS contact_info (
+  id BIGSERIAL PRIMARY KEY,
+  conversation_id BIGINT NOT NULL UNIQUE REFERENCES conversations(id) ON DELETE CASCADE,
+  name VARCHAR(255),
+  address TEXT,
+  telephone VARCHAR(50),
+  telegram_id VARCHAR(100),
+  telegram_id2 VARCHAR(100),
+  signal_id VARCHAR(100),
+  signal_id2 VARCHAR(100),
+  product_interest TEXT,
+  sales_volume VARCHAR(100),
+  ready_for_sample BOOLEAN DEFAULT FALSE,
+  sample_recipient_info TEXT,
+  sample_feedback TEXT,
+  payment_method VARCHAR(100),
+  delivery_method VARCHAR(100),
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_contact_info_conversation ON contact_info(conversation_id);

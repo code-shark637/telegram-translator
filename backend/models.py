@@ -112,3 +112,96 @@ class TdataUpload(BaseModel):
     account_name: str
     source_language: str = "auto"
     target_language: str = "en"
+
+# Message Templates
+class MessageTemplateCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    content: str = Field(..., min_length=1)
+
+class MessageTemplateUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    content: Optional[str] = Field(None, min_length=1)
+
+class MessageTemplateResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+# Scheduled Messages
+class ScheduledMessageCreate(BaseModel):
+    conversation_id: int
+    message_text: str = Field(..., min_length=1)
+    days_delay: int = Field(..., ge=1)  # Number of days to wait before sending
+
+class ScheduledMessageUpdate(BaseModel):
+    message_text: Optional[str] = Field(None, min_length=1)
+    days_delay: Optional[int] = Field(None, ge=1)
+
+class ScheduledMessageResponse(BaseModel):
+    id: int
+    conversation_id: int
+    message_text: str
+    scheduled_at: datetime
+    created_at: datetime
+    is_sent: bool
+    is_cancelled: bool
+
+# Contact CRM Information
+class ContactInfoCreate(BaseModel):
+    conversation_id: int
+    name: Optional[str] = None
+    address: Optional[str] = None
+    telephone: Optional[str] = None
+    telegram_id: Optional[str] = None
+    telegram_id2: Optional[str] = None
+    signal_id: Optional[str] = None
+    signal_id2: Optional[str] = None
+    product_interest: Optional[str] = None
+    sales_volume: Optional[str] = None
+    ready_for_sample: Optional[bool] = False
+    sample_recipient_info: Optional[str] = None
+    sample_feedback: Optional[str] = None
+    payment_method: Optional[str] = None
+    delivery_method: Optional[str] = None
+    note: Optional[str] = None
+
+class ContactInfoUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    telephone: Optional[str] = None
+    telegram_id: Optional[str] = None
+    telegram_id2: Optional[str] = None
+    signal_id: Optional[str] = None
+    signal_id2: Optional[str] = None
+    product_interest: Optional[str] = None
+    sales_volume: Optional[str] = None
+    ready_for_sample: Optional[bool] = None
+    sample_recipient_info: Optional[str] = None
+    sample_feedback: Optional[str] = None
+    payment_method: Optional[str] = None
+    delivery_method: Optional[str] = None
+    note: Optional[str] = None
+
+class ContactInfoResponse(BaseModel):
+    id: int
+    conversation_id: int
+    name: Optional[str]
+    address: Optional[str]
+    telephone: Optional[str]
+    telegram_id: Optional[str]
+    telegram_id2: Optional[str]
+    signal_id: Optional[str]
+    signal_id2: Optional[str]
+    product_interest: Optional[str]
+    sales_volume: Optional[str]
+    ready_for_sample: bool
+    sample_recipient_info: Optional[str]
+    sample_feedback: Optional[str]
+    payment_method: Optional[str]
+    delivery_method: Optional[str]
+    note: Optional[str]
+    created_at: datetime
+    updated_at: datetime

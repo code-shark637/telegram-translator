@@ -297,7 +297,7 @@ function App() {
   return (
     <Router>
     <div className="h-screen flex flex-col bg-gray-900">
-      <Header onSettingsClick={() => {}} />
+      <Header />
       
       <div className="flex-1 flex overflow-hidden">
         <Sidebar
@@ -330,6 +330,7 @@ function App() {
           sourceLanguage={currentAccount?.sourceLanguage || 'auto'}
           targetLanguage={currentAccount?.targetLanguage || 'en'}
           onSendMessage={handleSendMessage}
+          conversationId={currentConversation?.id}
         />
       </div>
 
