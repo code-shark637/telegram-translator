@@ -106,8 +106,9 @@ class SchedulerService:
                 conversation_id
             )
             
-            # Insert system message for each cancelled scheduled message
+            # Insert system message for each cancelled scheduled message and collect IDs
             from datetime import datetime
+            system_messages = []
             for msg in scheduled_msgs:
                 scheduled_date = msg['scheduled_at'].strftime('%Y-%m-%d %H:%M')
                 system_text = f"Scheduled message cancelled (was scheduled for {scheduled_date}): \"{msg['message_text']}\""
@@ -127,6 +128,11 @@ class SchedulerService:
                     system_text,
                     created_at
                 )
+                system_messages.append({
+                    'id': msg_id,
+                    'text': system_text,
+                    'created_at': created_at
+                })
             
             # Remove from memory
             to_remove = [
@@ -164,27 +170,23 @@ class SchedulerService:
                     )
                     
                     # Send system messages via WebSocket
-                    for msg in scheduled_msgs:
-                        scheduled_date = msg['scheduled_at'].strftime('%Y-%m-%d %H:%M')
-                        system_text = f"Scheduled message cancelled (was scheduled for {scheduled_date}): \"{msg['message_text']}\""
-                        
+                    for sys_msg in system_messages:
                         await manager.send_to_account(
                             {
                                 "type": "new_message",
                                 "message": {
-                                    "id": msg_id,  # Using the last msg_id from the loop above
+                                    "id": sys_msg['id'],
                                     "conversation_id": conversation_id,
                                     "telegram_message_id": None,
                                     "sender_user_id": None,
                                     "sender_name": "System",
                                     "sender_username": "system",
                                     "type": "system",
-                                    "original_text": system_text,
+                                    "original_text": sys_msg['text'],
                                     "translated_text": None,
                                     "source_language": None,
                                     "target_language": None,
-                                    "created_at": created_at.isoformat(),
-                                    "is_outgoing": False
+                                    "created_at": sys_msg['created_at'].isoformat()
                                 }
                             },
                             conversation['account_id'],

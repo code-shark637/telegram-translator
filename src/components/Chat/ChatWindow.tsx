@@ -50,8 +50,36 @@ export default function ChatWindow({
   useEffect(() => {
     if (conversationId) {
       loadScheduledMessages();
+    } else {
+      // Clear scheduled messages when no conversation is selected
+      setScheduledMessages([]);
     }
   }, [conversationId]);
+
+  // Reload scheduled messages when messages change (to detect system messages about sent/cancelled)
+  useEffect(() => {
+    if (conversationId && messages.length > 0) {
+      // Check if any recent message is a system message about scheduled messages
+      const recentMessages = messages.slice(-5); // Check last 5 messages
+      const hasScheduledSystemMessage = recentMessages.some(msg => 
+        msg.type === 'system' && 
+        msg.original_text && (
+          msg.original_text.includes('Scheduled message sent') ||
+          msg.original_text.includes('Scheduled message cancelled') ||
+          msg.original_text.includes('Scheduled message manually cancelled') ||
+          msg.original_text.includes('Scheduled message set')
+        )
+      );
+      
+      if (hasScheduledSystemMessage) {
+        // Add a small delay to ensure database is updated before reloading
+        const timer = setTimeout(() => {
+          loadScheduledMessages();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [messages, conversationId]);
 
   const loadTemplates = async () => {
     try {
@@ -81,11 +109,9 @@ export default function ChatWindow({
     if (!confirm('Cancel this scheduled message?')) return;
     try {
       await scheduledMessagesAPI.cancelScheduledMessage(messageId);
+      // Remove from local state immediately for instant feedback
       setScheduledMessages(scheduledMessages.filter(m => m.id !== messageId));
-      // Reload messages to show the system message
-      // The parent component should handle this, but we can trigger a refresh
-      // by calling the onSendMessage callback with empty string (no-op) or
-      // we can emit an event. For now, the WebSocket will handle the update.
+      // The system message will be added via WebSocket and trigger a reload
     } catch (err) {
       console.error('Failed to cancel scheduled message:', err);
     }
