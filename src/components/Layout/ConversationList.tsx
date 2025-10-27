@@ -1,7 +1,8 @@
-import { MessageCircle, Users, Bot, Search, Loader2 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { MessageCircle, Users, Bot, UserPlus } from 'lucide-react';
+import { useState } from 'react';
 import type { TelegramChat, TelegramUserSearchResult } from '../../types';
 import { telegramAPI } from '../../services/api';
+import SearchUsersModal from '../Modals/SearchUsersModal';
 
 interface ConversationListProps {
   conversations: TelegramChat[];
@@ -10,7 +11,7 @@ interface ConversationListProps {
   isConnected?: boolean;
   unreadCounts: Record<number, number>; // conversationId -> count
   accountId?: number;
-  onConversationCreated?: () => void;
+  onConversationCreated?: () => Promise<void>;
 }
 
 export default function ConversationList({
@@ -22,52 +23,9 @@ export default function ConversationList({
   accountId,
   onConversationCreated,
 }: ConversationListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<TelegramUserSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
-  // Debounced search
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (searchQuery.trim().length === 0) {
-      setSearchResults([]);
-      setShowResults(false);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    searchTimeoutRef.current = setTimeout(async () => {
-      if (!accountId || !isConnected) {
-        setIsSearching(false);
-        return;
-      }
-
-      try {
-        const results = await telegramAPI.searchUsers(accountId, searchQuery);
-        setSearchResults(results);
-        setShowResults(true);
-      } catch (error) {
-        console.error('Search failed:', error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500); // 500ms debounce
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery, accountId, isConnected]);
-
-  const handleUserClick = async (user: TelegramUserSearchResult) => {
+  const handleUserSelect = async (user: TelegramUserSearchResult) => {
     if (!accountId) return;
 
     try {
@@ -79,11 +37,6 @@ export default function ConversationList({
         username: user.username,
         type: 'private',
       });
-
-      // Clear search
-      setSearchQuery('');
-      setSearchResults([]);
-      setShowResults(false);
 
       // Notify parent to refresh conversations and wait for it
       if (onConversationCreated) {
@@ -126,92 +79,26 @@ export default function ConversationList({
   };
 
   return (
-    <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white mb-3">Conversations</h2>
-        
-        {/* Search Input */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="w-4 h-4 text-gray-400" />
+    <>
+      <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-white">Conversations</h2>
+            <button
+              onClick={() => setShowSearchModal(true)}
+              disabled={!isConnected}
+              className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              title="Search users"
+            >
+              <UserPlus className="w-5 h-5 text-white" />
+            </button>
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search users..."
-            disabled={!isConnected}
-            className="w-full pl-10 pr-10 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          />
-          {isSearching && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Search Results or Conversations List */}
-      <div className="flex-1 overflow-y-auto">
-        {showResults && searchQuery.trim().length > 0 ? (
-          // Search Results
-          <div className="p-2">
-            {isSearching ? (
-              <div className="p-4 text-center">
-                <Loader2 className="w-8 h-8 text-blue-500 mx-auto mb-2 animate-spin" />
-                <p className="text-gray-400 text-sm">Searching...</p>
-              </div>
-            ) : searchResults.length === 0 ? (
-              <div className="p-4 text-center">
-                <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">No Result</p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs text-gray-500 px-3 py-2 uppercase font-semibold">Search Results</p>
-                {searchResults.map((user) => {
-                  const displayName = user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown';
-                  const subtitle = user.username ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : user.phone || '';
-                  
-                  return (
-                    <div
-                      key={user.id}
-                      onClick={() => handleUserClick(user)}
-                      className="flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors mb-1 hover:bg-gray-700 text-gray-200"
-                    >
-                      {/* Avatar */}
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-600">
-                        <span className="text-sm font-medium">
-                          {displayName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-
-                      {/* User Info */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium truncate">
-                          {displayName}
-                        </h3>
-                        {subtitle && (
-                          <p className="text-xs text-gray-400 truncate">
-                            {subtitle}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* User Icon */}
-                      <div className="opacity-50">
-                        <MessageCircle className="w-4 h-4" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : (
-          // Conversations List
-          conversations.length === 0 ? (
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto">
+          {conversations.length === 0 ? (
             <div className="p-4 text-center">
               <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-2" />
               <p className="text-gray-400 text-sm">
@@ -283,9 +170,18 @@ export default function ConversationList({
                 </div>
               ))}
             </div>
-          )
-        )}
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Search Modal */}
+      <SearchUsersModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        accountId={accountId || 0}
+        isConnected={isConnected}
+        onUserSelect={handleUserSelect}
+      />
+    </>
   );
 }
