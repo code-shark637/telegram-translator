@@ -129,6 +129,23 @@ export const telegramAPI = {
   deleteAccount: async (accountId: number): Promise<void> => {
     await api.delete(`/telegram/accounts/${accountId}`);
   },
+
+  searchUsers: async (accountId: number, username: string) => {
+    const response = await api.get(`/telegram/accounts/${accountId}/search-users`, {
+      params: { username }
+    });
+    return response.data;
+  },
+
+  createConversation: async (accountId: number, data: {
+    telegram_peer_id: number;
+    title?: string;
+    username?: string;
+    type?: string;
+  }) => {
+    const response = await api.post(`/telegram/accounts/${accountId}/conversations`, data);
+    return response.data;
+  },
 };
 
 // Translation API

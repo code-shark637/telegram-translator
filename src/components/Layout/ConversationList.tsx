@@ -1,5 +1,8 @@
-import { MessageCircle, Users, Bot } from 'lucide-react';
-import type { TelegramChat } from '../../types';
+import { MessageCircle, Users, Bot, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import type { TelegramChat, TelegramUserSearchResult } from '../../types';
+import { telegramAPI } from '../../services/api';
+import SearchUsersModal from '../Modals/SearchUsersModal';
 
 interface ConversationListProps {
   conversations: TelegramChat[];
@@ -7,6 +10,8 @@ interface ConversationListProps {
   onConversationSelect: (conversation: TelegramChat) => void;
   isConnected?: boolean;
   unreadCounts: Record<number, number>; // conversationId -> count
+  accountId?: number;
+  onConversationCreated?: () => Promise<void>;
 }
 
 export default function ConversationList({
@@ -15,7 +20,44 @@ export default function ConversationList({
   onConversationSelect,
   isConnected = false,
   unreadCounts,
+  accountId,
+  onConversationCreated,
 }: ConversationListProps) {
+  const [showSearchModal, setShowSearchModal] = useState(false);
+
+  const handleUserSelect = async (user: TelegramUserSearchResult) => {
+    if (!accountId) return;
+
+    try {
+      // Build title from first_name and last_name
+      const titleParts = [];
+      if (user.first_name) titleParts.push(user.first_name);
+      if (user.last_name) titleParts.push(user.last_name);
+      const title = titleParts.length > 0 ? titleParts.join(' ') : user.username || 'Unknown';
+      
+      const conversation = await telegramAPI.createConversation(accountId, {
+        telegram_peer_id: user.id,
+        title: title,
+        username: user.username,
+        type: 'private',
+      });
+
+      // Notify parent to refresh conversations and wait for it
+      if (onConversationCreated) {
+        await onConversationCreated();
+      }
+
+      // Select the new conversation after reload
+      onConversationSelect({
+        id: conversation.id,
+        title: conversation.title,
+        username: user.username,
+        type: 'private',
+      } as TelegramChat);
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+    }
+  };
   const getConversationIcon = (type: string) => {
     switch (type) {
       case 'private':
@@ -41,24 +83,35 @@ export default function ConversationList({
   };
 
   return (
-    <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white">Conversations</h2>
-      </div>
-
-      {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto">
-        {conversations.length === 0 ? (
-          <div className="p-4 text-center">
-            <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm">
-              {isConnected ? 'No conversations yet' : 'Connect account to see conversations'}
-            </p>
+    <>
+      <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-white">Conversations</h2>
+            <button
+              onClick={() => setShowSearchModal(true)}
+              disabled={!isConnected}
+              className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              title="Search users"
+            >
+              <UserPlus className="w-5 h-5 text-white" />
+            </button>
           </div>
-        ) : (
-          <div className="p-2">
-            {conversations.map((conversation) => (
+        </div>
+
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto">
+          {conversations.length === 0 ? (
+            <div className="p-4 text-center">
+              <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-400 text-sm">
+                {isConnected ? 'No conversations yet' : 'Connect account to see conversations'}
+              </p>
+            </div>
+          ) : (
+            <div className="p-2">
+              {conversations.map((conversation) => (
               <div
                 key={conversation.id}
                 onClick={() => onConversationSelect(conversation)}
@@ -118,11 +171,21 @@ export default function ConversationList({
                 <div className="opacity-50">
                   {getConversationIcon(conversation.type)}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Search Modal */}
+      <SearchUsersModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        accountId={accountId || 0}
+        isConnected={isConnected}
+        onUserSelect={handleUserSelect}
+      />
+    </>
   );
 }
