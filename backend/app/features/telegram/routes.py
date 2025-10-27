@@ -9,6 +9,8 @@ from models import (
     ConversationResponse,
     MessageResponse,
     MessageSend,
+    UserSearchResult,
+    ConversationCreate,
 )
 from telethon_service import telethon_service
 from translation_service import translation_service
@@ -345,5 +347,115 @@ async def get_conversations(
 
     return result
 
+
+@router.get("/accounts/{account_id}/search-users", response_model=List[UserSearchResult])
+async def search_users(
+    account_id: int,
+    username: str,
+    current_user = Depends(get_current_user),
+):
+    """Search for Telegram users by username"""
+    account = await db.fetchrow(
+        "SELECT * FROM telegram_accounts WHERE id = $1 AND user_id = $2",
+        account_id,
+        current_user.user_id,
+    )
+
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found",
+        )
+
+    # Check if session is connected
+    session = await telethon_service.get_session(account_id)
+    if not session or not session.is_connected:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account not connected",
+        )
+
+    try:
+        users = await telethon_service.search_users(account_id, username, limit=10)
+        return users
+    except Exception as e:
+        logger.error(f"Error searching users: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search users: {str(e)}",
+        )
+
+
+@router.post("/accounts/{account_id}/conversations", response_model=ConversationResponse)
+async def create_conversation(
+    account_id: int,
+    conversation_data: ConversationCreate,
+    current_user = Depends(get_current_user),
+):
+    """Create a new conversation with a Telegram user"""
+    account = await db.fetchrow(
+        "SELECT * FROM telegram_accounts WHERE id = $1 AND user_id = $2",
+        account_id,
+        current_user.user_id,
+    )
+
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found",
+        )
+
+    # Check if conversation already exists
+    existing = await db.fetchrow(
+        "SELECT * FROM conversations WHERE telegram_account_id = $1 AND telegram_peer_id = $2",
+        account_id,
+        conversation_data.telegram_peer_id,
+    )
+
+    if existing:
+        # Return existing conversation
+        return {
+            "id": existing['id'],
+            "telegram_account_id": existing['telegram_account_id'],
+            "telegram_peer_id": existing['telegram_peer_id'],
+            "title": existing['title'],
+            "type": existing['type'],
+            "is_archived": existing['is_archived'],
+            "created_at": existing['created_at'],
+            "last_message_at": existing.get('last_message_at'),
+            "unread_count": 0,
+        }
+
+    # Create new conversation
+    conversation_id = await db.fetchval(
+        """
+        INSERT INTO conversations (telegram_account_id, telegram_peer_id, title, type)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+        """,
+        account_id,
+        conversation_data.telegram_peer_id,
+        conversation_data.title or conversation_data.username or "Unknown",
+        conversation_data.type,
+    )
+
+    conversation = await db.fetchrow(
+        "SELECT * FROM conversations WHERE id = $1",
+        conversation_id,
+    )
+
+    logger.info(f"New conversation created: {conversation_id} for account {account_id}")
+
+    return {
+        "id": conversation['id'],
+        "telegram_account_id": conversation['telegram_account_id'],
+        "telegram_peer_id": conversation['telegram_peer_id'],
+        "title": conversation['title'],
+        "type": conversation['type'],
+        "is_archived": conversation['is_archived'],
+        "created_at": conversation['created_at'],
+        "last_message_at": conversation.get('last_message_at'),
+        "unread_count": 0,
+    }
 
 

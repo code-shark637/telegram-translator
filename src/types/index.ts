@@ -117,3 +117,12 @@ export interface ContactInfo {
   created_at: string;
   updated_at: string;
 }
+
+export interface TelegramUserSearchResult {
+  id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  is_contact: boolean;
+}

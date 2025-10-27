@@ -229,6 +229,38 @@ class TelegramSession:
             return "channel" if entity.broadcast else "supergroup"
         return "private"
 
+    async def search_users(self, username: str, limit: int = 10):
+        """Search for Telegram users by username"""
+        if not self.client or not self.is_connected:
+            return []
+
+        try:
+            from telethon.tl.functions.contacts import SearchRequest
+            
+            # Search globally using Telegram's search
+            search_results = await self.client(SearchRequest(
+                q=username,
+                limit=limit
+            ))
+            
+            users = []
+            for user in search_results.users:
+                if isinstance(user, User) and not user.bot:
+                    users.append({
+                        "id": user.id,
+                        "username": user.username,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "phone": user.phone,
+                        "is_contact": user.contact,
+                    })
+            print(users)
+            return users[:limit]
+                
+        except Exception as e:
+            logger.error(f"Error searching users for {self.account_id}: {e}")
+            return []
+
 
 class TelethonService:
     def __init__(self):
@@ -319,6 +351,14 @@ class TelethonService:
             raise Exception("Session not connected")
 
         return await session.get_unread_messages()
+
+    async def search_users(self, account_id: int, username: str, limit: int = 10):
+        """Search for Telegram users by username"""
+        session = self.sessions.get(account_id)
+        if not session:
+            raise Exception("Session not connected")
+
+        return await session.search_users(username, limit)
 
     async def _setup_event_handlers(self, session: TelegramSession):
         @session.client.on(events.NewMessage)

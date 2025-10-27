@@ -319,6 +319,8 @@ function App() {
             onConversationSelect={handleConversationSelect}
             isConnected={currentAccount.isConnected}
             unreadCounts={unreadCounts[currentAccount.id] || {}}
+            accountId={currentAccount.id}
+            onConversationCreated={loadConversations}
           />
         )}
         

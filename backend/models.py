@@ -205,3 +205,18 @@ class ContactInfoResponse(BaseModel):
     note: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+# User Search
+class UserSearchResult(BaseModel):
+    id: int
+    username: Optional[str]
+    first_name: Optional[str]
+    last_name: Optional[str]
+    phone: Optional[str]
+    is_contact: bool
+
+class ConversationCreate(BaseModel):
+    telegram_peer_id: int
+    title: Optional[str]
+    username: Optional[str]
+    type: str = "private"
