@@ -29,11 +29,15 @@ export default function ConversationList({
     if (!accountId) return;
 
     try {
-      const displayName = user.username || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown';
+      // Build title from first_name and last_name
+      const titleParts = [];
+      if (user.first_name) titleParts.push(user.first_name);
+      if (user.last_name) titleParts.push(user.last_name);
+      const title = titleParts.length > 0 ? titleParts.join(' ') : user.username || 'Unknown';
       
       const conversation = await telegramAPI.createConversation(accountId, {
         telegram_peer_id: user.id,
-        title: displayName,
+        title: title,
         username: user.username,
         type: 'private',
       });
