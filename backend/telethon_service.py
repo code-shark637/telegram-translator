@@ -254,7 +254,7 @@ class TelegramSession:
                         "phone": user.phone,
                         "is_contact": user.contact,
                     })
-            print(users)
+            
             return users[:limit]
                 
         except Exception as e:

@@ -85,12 +85,12 @@ export default function ConversationList({
       setSearchResults([]);
       setShowResults(false);
 
-      // Notify parent to refresh conversations
+      // Notify parent to refresh conversations and wait for it
       if (onConversationCreated) {
-        onConversationCreated();
+        await onConversationCreated();
       }
 
-      // Select the new conversation
+      // Select the new conversation after reload
       onConversationSelect({
         id: conversation.id,
         title: conversation.title,

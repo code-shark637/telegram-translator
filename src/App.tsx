@@ -320,7 +320,7 @@ function App() {
             isConnected={currentAccount.isConnected}
             unreadCounts={unreadCounts[currentAccount.id] || {}}
             accountId={currentAccount.id}
-            onConversationCreated={loadConversations}
+            onConversationCreated={() => loadConversations(currentAccount.id)}
           />
         )}
         
