@@ -68,6 +68,8 @@ async def get_messages(
             "target_language": msg['target_language'],
             "created_at": created_at,
             "edited_at": msg['edited_at'],
+            "is_outgoing": msg.get('is_outgoing', False),
+            "media_file_name": msg.get('media_file_name'),
         })
 
     return result
@@ -253,8 +255,8 @@ async def send_media(
             """
             INSERT INTO messages
             (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
-             original_text, translated_text, source_language, target_language, created_at, is_outgoing)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             original_text, translated_text, source_language, target_language, created_at, is_outgoing, media_file_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id
             """,
             conversation_id,
@@ -268,7 +270,8 @@ async def send_media(
             source_lang,
             conversation['source_language'],
             sent_message['date'],
-            True
+            True,
+            file.filename
         )
         
         await db.execute(
@@ -294,6 +297,7 @@ async def send_media(
             "target_language": conversation['source_language'],
             "created_at": sent_message['date'].isoformat() if sent_message['date'] else None,
             "is_outgoing": True,
+            "media_file_name": file.filename,
         }
         
         await manager.send_to_account(
@@ -326,20 +330,24 @@ async def download_media(
     current_user = Depends(get_current_user),
 ):
     """Download media from a message"""
-    conversation = await db.fetchrow(
+    # Get message with filename
+    message = await db.fetchrow(
         """
-        SELECT c.*, ta.user_id
-        FROM conversations c
+        SELECT m.*, c.telegram_account_id, c.telegram_peer_id
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
         JOIN telegram_accounts ta ON c.telegram_account_id = ta.id
-        WHERE c.id = $1
+        WHERE m.id = $1 AND c.id = $2 AND ta.user_id = $3
         """,
+        message_id,
         conversation_id,
+        current_user.user_id,
     )
 
-    if not conversation or conversation['user_id'] != current_user.user_id:
+    if not message:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found",
+            detail="Message not found",
         )
 
     try:
@@ -350,9 +358,9 @@ async def download_media(
         
         # Download media via Telethon
         file_path = await telethon_service.download_media(
-            conversation['telegram_account_id'],
+            message['telegram_account_id'],
             telegram_message_id,
-            conversation['telegram_peer_id'],
+            message['telegram_peer_id'],
             download_path
         )
         
@@ -362,9 +370,12 @@ async def download_media(
                 detail="Media file not found",
             )
         
+        # Use stored filename or fallback to downloaded filename
+        filename = message.get('media_file_name') or os.path.basename(file_path)
+        
         return FileResponse(
             path=file_path,
-            filename=os.path.basename(file_path),
+            filename=filename,
             media_type='application/octet-stream'
         )
         

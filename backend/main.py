@@ -88,8 +88,8 @@ async def lifespan(app: FastAPI):
                 """
                 INSERT INTO messages
                 (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
-                 original_text, translated_text, source_language, target_language, created_at, is_outgoing)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                 original_text, translated_text, source_language, target_language, created_at, is_outgoing, media_file_name)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                 RETURNING id
                 """,
                 conversation_id,
@@ -103,7 +103,8 @@ async def lifespan(app: FastAPI):
                 source_lang,
                 account['target_language'],
                 created_at,
-                message_data.get('is_outgoing', False)
+                message_data.get('is_outgoing', False),
+                message_data.get('media_filename')
             )
 
             await db.execute(
@@ -134,7 +135,8 @@ async def lifespan(app: FastAPI):
                         "target_language": account['target_language'],
                         "created_at": created_at.isoformat() if created_at else None,
                         "is_outgoing": message_data.get('is_outgoing', False),
-                        "has_media": message_data.get('has_media', False)
+                        "has_media": message_data.get('has_media', False),
+                        "media_file_name": message_data.get('media_filename')
                     }
                 },
                 account_id,

@@ -35,6 +35,7 @@ export interface TelegramMessage {
   is_outgoing: boolean;
   replyToMessageId?: number;
   has_media?: boolean;
+  media_file_name?: string;
 }
 
 export interface TelegramChat {

@@ -453,21 +453,39 @@ class TelethonService:
                 except:
                     peer_title = sender_info["name"]
 
-                # Determine message type
+                # Determine message type and extract filename
                 msg_type = "text"
                 has_media = False
+                media_filename = None
+                
                 if message.photo:
                     msg_type = "photo"
                     has_media = True
+                    media_filename = f"photo_{message.id}.jpg"
                 elif message.video:
                     msg_type = "video"
                     has_media = True
+                    if message.document and hasattr(message.document, 'attributes'):
+                        for attr in message.document.attributes:
+                            if hasattr(attr, 'file_name'):
+                                media_filename = attr.file_name
+                                break
+                    if not media_filename:
+                        media_filename = f"video_{message.id}.mp4"
                 elif message.voice:
                     msg_type = "voice"
                     has_media = True
+                    media_filename = f"voice_{message.id}.ogg"
                 elif message.document:
                     msg_type = "document"
                     has_media = True
+                    if hasattr(message.document, 'attributes'):
+                        for attr in message.document.attributes:
+                            if hasattr(attr, 'file_name'):
+                                media_filename = attr.file_name
+                                break
+                    if not media_filename:
+                        media_filename = f"document_{message.id}"
 
                 message_data = {
                     "account_id": session.account_id,
@@ -481,7 +499,8 @@ class TelethonService:
                     "date": message.date,
                     "is_outgoing": message.out,
                     "type": msg_type,
-                    "has_media": has_media
+                    "has_media": has_media,
+                    "media_filename": media_filename
                 }
                 print("message_data", message_data)
 

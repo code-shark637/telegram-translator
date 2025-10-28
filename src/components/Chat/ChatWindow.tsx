@@ -216,12 +216,23 @@ export default function ChatWindow({
         throw new Error('Failed to download media');
       }
 
+      // Get filename from Content-Disposition header or use stored filename
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = message.media_file_name || `media_${message.telegram_message_id}`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
       // Create blob and download
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `media_${message.telegram_message_id}`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(downloadUrl);
@@ -435,10 +446,14 @@ export default function ChatWindow({
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">
-                            {message.type === 'photo' && '📷 Photo'}
-                            {message.type === 'video' && '🎥 Video'}
-                            {message.type === 'document' && '📄 Document'}
+                          <p className="text-sm font-medium truncate">
+                            {message.media_file_name || (
+                              <>
+                                {message.type === 'photo' && '📷 Photo'}
+                                {message.type === 'video' && '🎥 Video'}
+                                {message.type === 'document' && '📄 Document'}
+                              </>
+                            )}
                           </p>
                           <p className="text-xs text-gray-400">Click to download</p>
                         </div>
