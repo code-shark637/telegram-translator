@@ -26,7 +26,7 @@ export interface TelegramMessage {
   sender_name?: string;
   sender_username?: string;
   peer_title: string;
-  type: string;
+  type: 'text' | 'photo' | 'video' | 'voice' | 'document' | 'system';
   original_text: string;
   translated_text?: string;
   source_language?: string;
@@ -34,6 +34,8 @@ export interface TelegramMessage {
   created_at: string;
   is_outgoing: boolean;
   replyToMessageId?: number;
+  has_media?: boolean;
+  media_file_name?: string;
 }
 
 export interface TelegramChat {

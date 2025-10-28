@@ -14,3 +14,4 @@ cryptg==0.4.0
 googletrans==4.0.0rc1
 pydantic==2.9.1
 pydantic-settings==2.5.2
+aiofiles==24.1.0
