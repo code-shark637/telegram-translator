@@ -211,6 +211,66 @@ class TelegramSession:
             logger.error(f"Error sending message for {self.account_id}: {e}")
             raise
 
+    async def send_media(self, peer_id: int, file_path: str, caption: str = ""):
+        """Send a media file (photo, video, document) to a peer"""
+        if not self.client or not self.is_connected:
+            raise Exception("Client not connected")
+
+        try:
+            message = await self.client.send_file(
+                peer_id,
+                file_path,
+                caption=caption
+            )
+            
+            # Get current user information
+            me = await self.client.get_me()
+            
+            # Determine message type
+            msg_type = "document"
+            if message.photo:
+                msg_type = "photo"
+            elif message.video:
+                msg_type = "video"
+            elif message.voice:
+                msg_type = "voice"
+            
+            return {
+                "message_id": message.id,
+                "text": caption,
+                "date": message.date,
+                "is_outgoing": True,
+                "type": msg_type,
+                "sender_user_id": me.id,
+                "sender_name": f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown",
+                "sender_username": me.username,
+                "media": message.media
+            }
+        except Exception as e:
+            logger.error(f"Error sending media for {self.account_id}: {e}")
+            raise
+
+    async def download_media(self, message_id: int, peer_id: int, download_path: str):
+        """Download media from a message"""
+        if not self.client or not self.is_connected:
+            raise Exception("Client not connected")
+
+        try:
+            # Get the message
+            messages = await self.client.get_messages(peer_id, ids=message_id)
+            if not messages or not messages.media:
+                raise Exception("Message not found or has no media")
+            
+            message = messages
+            
+            # Download the media
+            file_path = await self.client.download_media(message, file=download_path)
+            
+            return file_path
+        except Exception as e:
+            logger.error(f"Error downloading media for {self.account_id}: {e}")
+            raise
+
     def _get_peer_id(self, entity) -> int:
         if isinstance(entity, User):
             return entity.id
@@ -360,6 +420,22 @@ class TelethonService:
 
         return await session.search_users(username, limit)
 
+    async def send_media(self, account_id: int, peer_id: int, file_path: str, caption: str = ""):
+        """Send media file to a peer"""
+        session = self.sessions.get(account_id)
+        if not session:
+            raise Exception("Session not connected")
+
+        return await session.send_media(peer_id, file_path, caption)
+
+    async def download_media(self, account_id: int, message_id: int, peer_id: int, download_path: str):
+        """Download media from a message"""
+        session = self.sessions.get(account_id)
+        if not session:
+            raise Exception("Session not connected")
+
+        return await session.download_media(message_id, peer_id, download_path)
+
     async def _setup_event_handlers(self, session: TelegramSession):
         @session.client.on(events.NewMessage)
         async def handle_new_message(event):
@@ -377,17 +453,35 @@ class TelethonService:
                 except:
                     peer_title = sender_info["name"]
 
+                # Determine message type
+                msg_type = "text"
+                has_media = False
+                if message.photo:
+                    msg_type = "photo"
+                    has_media = True
+                elif message.video:
+                    msg_type = "video"
+                    has_media = True
+                elif message.voice:
+                    msg_type = "voice"
+                    has_media = True
+                elif message.document:
+                    msg_type = "document"
+                    has_media = True
+
                 message_data = {
                     "account_id": session.account_id,
                     "peer_id": peer_id,
                     "message_id": message.id,
-                    "text": message.text,
+                    "text": message.text or message.message or "",
                     "sender_id": message.sender_id,
                     "sender_name": sender_info["name"],
                     "sender_username": sender_info["username"],
                     "peer_title": peer_title,
                     "date": message.date,
-                    "is_outgoing": message.out
+                    "is_outgoing": message.out,
+                    "type": msg_type,
+                    "has_media": has_media
                 }
                 print("message_data", message_data)
 

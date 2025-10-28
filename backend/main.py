@@ -66,70 +66,80 @@ async def lifespan(app: FastAPI):
             else:
                 conversation_id = conversation['id']
 
-            if message_data.get('text'):
+            # Ensure we have a valid datetime for created_at
+            created_at = message_data['date'] if message_data['date'] is not None else datetime.now()
+            
+            msg_type = message_data.get('type', 'text')
+            text = message_data.get('text', '')
+            
+            # Translate text if present
+            translated_text = None
+            source_lang = None
+            if text:
                 translation = await translation_service.translate_text(
-                    message_data['text'],
+                    text,
                     account['target_language'],
                     account['source_language']
                 )
+                translated_text = translation['translated_text']
+                source_lang = translation['source_language']
+            
+            message_id = await db.fetchval(
+                """
+                INSERT INTO messages
+                (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
+                 original_text, translated_text, source_language, target_language, created_at, is_outgoing)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id
+                """,
+                conversation_id,
+                message_data['message_id'],
+                message_data.get('sender_id'),
+                message_data.get('sender_name'),
+                message_data.get('sender_username'),
+                msg_type,
+                text,
+                translated_text,
+                source_lang,
+                account['target_language'],
+                created_at,
+                message_data.get('is_outgoing', False)
+            )
 
-                # Ensure we have a valid datetime for created_at
-                created_at = message_data['date'] if message_data['date'] is not None else datetime.now()
-                
-                message_id = await db.fetchval(
-                    """
-                    INSERT INTO messages
-                    (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
-                     original_text, translated_text, source_language, target_language, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                    RETURNING id
-                    """,
-                    conversation_id,
-                    message_data['message_id'],
-                    message_data.get('sender_id'),
-                    message_data.get('sender_name'),
-                    message_data.get('sender_username'),
-                    'text',
-                    message_data['text'],
-                    translation['translated_text'],
-                    translation['source_language'],
-                    account['target_language'],
-                    created_at
-                )
+            await db.execute(
+                "UPDATE conversations SET last_message_at = $1 WHERE id = $2",
+                created_at,
+                conversation_id
+            )
+            
+            # Cancel scheduled messages if this is an incoming message
+            if not message_data.get('is_outgoing', False):
+                await scheduler_service.cancel_scheduled_messages_for_conversation(conversation_id)
 
-                await db.execute(
-                    "UPDATE conversations SET last_message_at = $1 WHERE id = $2",
-                    created_at,
-                    conversation_id
-                )
-                
-                # Cancel scheduled messages if this is an incoming message
-                if not message_data.get('is_outgoing', False):
-                    await scheduler_service.cancel_scheduled_messages_for_conversation(conversation_id)
-
-                await manager.send_to_account(
-                    {
-                        "type": "new_message",
-                        "message": {
-                            "id": message_id,
-                            "conversation_id": conversation_id,
-                            "telegram_message_id": message_data['message_id'],
-                            "sender_user_id": message_data.get('sender_id'),
-                            "sender_name": message_data.get('sender_name'),
-                            "sender_username": message_data.get('sender_username'),
-                            "peer_title": message_data.get('peer_title'),
-                            "type": "text",
-                            "original_text": message_data['text'],
-                            "translated_text": translation['translated_text'],
-                            "source_language": translation['source_language'],
-                            "target_language": account['target_language'],
-                            "created_at": created_at.isoformat() if created_at else None,
-                            "is_outgoing": message_data.get('is_outgoing', False)
-                        }
-                    },
-                    account_id,
-                    account['user_id']
-                )
+            await manager.send_to_account(
+                {
+                    "type": "new_message",
+                    "message": {
+                        "id": message_id,
+                        "conversation_id": conversation_id,
+                        "telegram_message_id": message_data['message_id'],
+                        "sender_user_id": message_data.get('sender_id'),
+                        "sender_name": message_data.get('sender_name'),
+                        "sender_username": message_data.get('sender_username'),
+                        "peer_title": message_data.get('peer_title'),
+                        "type": msg_type,
+                        "original_text": text,
+                        "translated_text": translated_text,
+                        "source_language": source_lang,
+                        "target_language": account['target_language'],
+                        "created_at": created_at.isoformat() if created_at else None,
+                        "is_outgoing": message_data.get('is_outgoing', False),
+                        "has_media": message_data.get('has_media', False)
+                    }
+                },
+                account_id,
+                account['user_id']
+            )
 
         except Exception as e:
             logger.error(f"Error handling new message: {e}")

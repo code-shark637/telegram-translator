@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Languages, Clock, FileText, Copy, User } from 'lucide-react';
+import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video } from 'lucide-react';
 import { templatesAPI, scheduledMessagesAPI } from '../../services/api';
 import type { TelegramMessage, TelegramChat, TelegramAccount, MessageTemplate, ScheduledMessage } from '../../types';
 import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
@@ -36,7 +36,11 @@ export default function ChatWindow({
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactSaveAlert, setContactSaveAlert] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -123,6 +127,78 @@ export default function ChatWindow({
   const handleContactSaved = () => {
     setContactSaveAlert(true);
     setTimeout(() => setContactSaveAlert(false), 3000);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file type (images and videos)
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'];
+    // if (!validTypes.includes(file.type)) {
+    //   alert('Please select an image or video file');
+    //   return;
+    // }
+
+    // Check file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      alert('File size must be less than 50MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSendFile = async () => {
+    if (!selectedFile || !currentConversation || !isConnected) return;
+
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('conversation_id', currentConversation.id.toString());
+      formData.append('caption', newMessage);
+
+      const response = await fetch('http://localhost:8000/api/messages/send-media', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('auth_token=')[1]?.split(';')[0]}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send media');
+      }
+
+      // Clear file and message
+      handleRemoveFile();
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to send file:', error);
+      alert('Failed to send file. Please try again.');
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   // Sort messages by timestamp
@@ -406,7 +482,41 @@ export default function ChatWindow({
           </button>
         </div>
 
+        {/* File Preview */}
+        {selectedFile && (
+          <div className="mb-4 p-4 bg-gray-700 rounded-lg border border-gray-600">
+            <div className="flex items-start space-x-3">
+              {filePreview ? (
+                <img src={filePreview} alt="Preview" className="w-20 h-20 object-cover rounded" />
+              ) : (
+                <div className="w-20 h-20 bg-gray-600 rounded flex items-center justify-center">
+                  <Video className="w-8 h-8 text-gray-400" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{selectedFile.name}</p>
+                <p className="text-xs text-gray-400">
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+              <button
+                onClick={handleRemoveFile}
+                className="text-gray-400 hover:text-white"
+                type="button"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSendMessage} className="flex space-x-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
           <div className="flex-1 relative">
             <input
               type="text"
@@ -429,12 +539,37 @@ export default function ChatWindow({
             )}
           </div>
           <button
-            type="submit"
-            disabled={!newMessage.trim() || !isConnected || !currentConversation || translating}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!isConnected || !currentConversation || uploadingFile}
+            className="px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+            title="Attach file"
           >
-            <Send className="w-4 h-4" />
+            <Paperclip className="w-4 h-4" />
           </button>
+          {selectedFile ? (
+            <button
+              type="button"
+              onClick={handleSendFile}
+              disabled={uploadingFile || !isConnected || !currentConversation}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+            >
+              {uploadingFile ? (
+                <Languages className="w-4 h-4 animate-pulse" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              <span>{uploadingFile ? 'Sending...' : 'Send File'}</span>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!newMessage.trim() || !isConnected || !currentConversation || translating}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowScheduleModal(true)}
