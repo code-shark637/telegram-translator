@@ -91,6 +91,7 @@ class MessageResponse(BaseModel):
     created_at: datetime
     edited_at: Optional[datetime]
     is_outgoing: bool = False
+    media_file_name: Optional[str] = None
 
 class MessageSend(BaseModel):
     conversation_id: int
