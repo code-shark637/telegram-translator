@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video } from 'lucide-react';
+import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video, Download, Play } from 'lucide-react';
 import { templatesAPI, scheduledMessagesAPI } from '../../services/api';
 import type { TelegramMessage, TelegramChat, TelegramAccount, MessageTemplate, ScheduledMessage } from '../../types';
 import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
@@ -201,6 +201,37 @@ export default function ChatWindow({
     }
   };
 
+  const handleDownloadMedia = async (message: TelegramMessage) => {
+    try {
+      const token = document.cookie.split('auth_token=')[1]?.split(';')[0];
+      const url = `http://localhost:8000/api/messages/download-media/${message.conversation_id}/${message.id}?telegram_message_id=${message.telegram_message_id}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download media');
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `media_${message.telegram_message_id}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download media:', error);
+      alert('Failed to download media. Please try again.');
+    }
+  };
+
   // Sort messages by timestamp
   const sortedMessages = useMemo(() => {
     return [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -388,17 +419,53 @@ export default function ChatWindow({
                       : 'bg-gray-700 text-gray-200 rounded-bl-md'
                   }`}
                 >
-                  {/* Original message */}
-                  <div className="mb-2">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="text-xs font-medium text-blue-400">
-                        {message.source_language && `${message.source_language.toUpperCase()}`}
-                      </span>
-                      <span className="text-sm leading-relaxed">{message.original_text}</span>
+                  {/* Media content */}
+                  {(message.type === 'photo' || message.type === 'video' || message.type === 'document') && (
+                    <div className="mb-3">
+                      <div className="bg-gray-800/50 rounded-lg p-3 flex items-center space-x-3">
+                        <div className="flex-shrink-0">
+                          {message.type === 'photo' && (
+                            <ImageIcon className="w-8 h-8 text-blue-400" />
+                          )}
+                          {message.type === 'video' && (
+                            <Video className="w-8 h-8 text-purple-400" />
+                          )}
+                          {message.type === 'document' && (
+                            <FileText className="w-8 h-8 text-green-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            {message.type === 'photo' && '📷 Photo'}
+                            {message.type === 'video' && '🎥 Video'}
+                            {message.type === 'document' && '📄 Document'}
+                          </p>
+                          <p className="text-xs text-gray-400">Click to download</p>
+                        </div>
+                        <button
+                          onClick={() => handleDownloadMedia(message)}
+                          className="flex-shrink-0 p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                          title="Download"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Translated message */}
+                  {/* Caption/Text */}
+                  {message.original_text && (
+                    <div className="mb-2">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="text-xs font-medium text-blue-400">
+                          {message.source_language && `${message.source_language.toUpperCase()}`}
+                        </span>
+                        <span className="text-sm leading-relaxed">{message.original_text}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Translated caption/message */}
                   {message.translated_text && (
                     <div className="border-t border-gray-500 pt-2 mt-2">
                       <p className="text-sm leading-relaxed">{message.translated_text}</p>
