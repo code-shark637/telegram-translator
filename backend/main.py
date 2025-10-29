@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
                     account_id,
                     peer_id,
                     message_data.get('peer_title', 'Unknown'),
-                    message_data.get('type', 'private')
+                    message_data.get('conversation_type', 'private')
                 )
             else:
                 conversation_id = conversation['id']

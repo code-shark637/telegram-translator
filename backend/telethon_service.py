@@ -446,12 +446,14 @@ class TelethonService:
                 # Get sender information safely
                 sender_info = await session._get_sender_info_safe(message.sender_id)
                 
-                # Get peer title
+                # Get peer title and conversation type
                 try:
                     chat = await event.get_chat()
                     peer_title = getattr(chat, 'title', None) or sender_info["name"]
+                    conversation_type = session._get_conversation_type(chat)
                 except:
                     peer_title = sender_info["name"]
+                    conversation_type = "private"
 
                 # Determine message type and extract filename
                 msg_type = "text"
@@ -496,6 +498,7 @@ class TelethonService:
                     "sender_name": sender_info["name"],
                     "sender_username": sender_info["username"],
                     "peer_title": peer_title,
+                    "conversation_type": conversation_type,
                     "date": message.date,
                     "is_outgoing": message.out,
                     "type": msg_type,
