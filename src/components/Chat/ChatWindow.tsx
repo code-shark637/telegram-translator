@@ -6,6 +6,209 @@ import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
 import MessageTemplatesModal from '../Modals/MessageTemplatesModal';
 import ContactInfoModal from '../Modals/ContactInfoModal';
 
+// Photo Message Component - displays images inline like Telegram
+const PhotoMessage: React.FC<{
+  message: TelegramMessage;
+  loadedImages: Record<number, string>;
+  loadImage: (message: TelegramMessage) => Promise<string | null>;
+  onDownload: (message: TelegramMessage) => void;
+}> = ({ message, loadedImages, loadImage, onDownload }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(loadedImages[message.id] || null);
+  const [loading, setLoading] = useState(!loadedImages[message.id]);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!loadedImages[message.id] && !error) {
+      setLoading(true);
+      loadImage(message).then(url => {
+        if (url) {
+          setImageUrl(url);
+        } else {
+          setError(true);
+        }
+        setLoading(false);
+      });
+    }
+  }, [message, loadedImages, loadImage, error]);
+
+  if (loading) {
+    return (
+      <div className="mb-2">
+        <div className="bg-gray-800/30 rounded-lg p-8 flex items-center justify-center min-w-[200px] min-h-[150px]">
+          <div className="flex flex-col items-center space-y-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+            <p className="text-xs text-gray-400">Loading image...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if media was deleted
+  if (imageUrl === 'DELETED') {
+    return (
+      <div className="mb-2">
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 flex items-center space-x-3">
+          <ImageIcon className="w-8 h-8 text-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-300">📷 Photo</p>
+            <p className="text-xs text-red-400">Media has been deleted</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className="mb-2">
+        <div 
+          className="bg-gray-800/50 rounded-lg p-4 flex items-center space-x-3 cursor-pointer hover:bg-gray-800/70 transition-colors"
+          onClick={() => onDownload(message)}
+        >
+          <ImageIcon className="w-8 h-8 text-blue-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">📷 Photo</p>
+            <p className="text-xs text-gray-400">Click to download</p>
+          </div>
+          <Download className="w-5 h-5 text-gray-400" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div 
+        className="relative rounded-lg overflow-hidden cursor-pointer group max-w-md"
+        onClick={() => onDownload(message)}
+        title="Click to download"
+      >
+        <img
+          src={imageUrl}
+          alt={message.media_file_name || 'Photo'}
+          className="w-full h-auto max-h-[400px] object-contain bg-gray-900/50"
+          style={{ display: 'block' }}
+        />
+        {/* Download overlay on hover */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center">
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center space-y-2">
+            <Download className="w-10 h-10 text-white drop-shadow-lg" />
+            <span className="text-white text-sm font-medium drop-shadow-lg">Download</span>
+          </div>
+        </div>
+      </div>
+      {message.media_file_name && (
+        <p className="text-xs text-gray-400 mt-1 px-1">{message.media_file_name}</p>
+      )}
+    </div>
+  );
+};
+
+// Video Message Component - displays videos inline like Telegram
+const VideoMessage: React.FC<{
+  message: TelegramMessage;
+  loadedImages: Record<number, string>;
+  loadImage: (message: TelegramMessage) => Promise<string | null>;
+  onDownload: (message: TelegramMessage) => void;
+}> = ({ message, loadedImages, loadImage, onDownload }) => {
+  const [videoUrl, setVideoUrl] = useState<string | null>(loadedImages[message.id] || null);
+  const [loading, setLoading] = useState(!loadedImages[message.id]);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!loadedImages[message.id] && !error) {
+      setLoading(true);
+      loadImage(message).then(url => {
+        if (url) {
+          setVideoUrl(url);
+        } else {
+          setError(true);
+        }
+        setLoading(false);
+      });
+    }
+  }, [message, loadedImages, loadImage, error]);
+
+  if (loading) {
+    return (
+      <div className="mb-2">
+        <div className="bg-gray-800/30 rounded-lg p-8 flex items-center justify-center min-w-[200px] min-h-[150px]">
+          <div className="flex flex-col items-center space-y-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+            <p className="text-xs text-gray-400">Loading video...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if media was deleted
+  if (videoUrl === 'DELETED') {
+    return (
+      <div className="mb-2">
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 flex items-center space-x-3">
+          <Video className="w-8 h-8 text-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-300">🎥 Video</p>
+            <p className="text-xs text-red-400">Media has been deleted</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !videoUrl) {
+    return (
+      <div className="mb-2">
+        <div 
+          className="bg-gray-800/50 rounded-lg p-4 flex items-center space-x-3 cursor-pointer hover:bg-gray-800/70 transition-colors"
+          onClick={() => onDownload(message)}
+        >
+          <Video className="w-8 h-8 text-purple-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">🎥 Video</p>
+            <p className="text-xs text-gray-400">Click to download</p>
+          </div>
+          <Download className="w-5 h-5 text-gray-400" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div 
+        className="relative rounded-lg overflow-hidden max-w-md bg-gray-900/50"
+      >
+        <video
+          src={videoUrl}
+          controls
+          className="w-full h-auto max-h-[400px] object-contain"
+          style={{ display: 'block' }}
+          preload="metadata"
+        >
+          Your browser does not support the video tag.
+        </video>
+        {/* Download button overlay */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDownload(message);
+          }}
+          className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 rounded-lg transition-colors"
+          title="Download video"
+        >
+          <Download className="w-5 h-5 text-white" />
+        </button>
+      </div>
+      {message.media_file_name && (
+        <p className="text-xs text-gray-400 mt-1 px-1">{message.media_file_name}</p>
+      )}
+    </div>
+  );
+};
+
 interface ChatWindowProps {
   messages: TelegramMessage[];
   currentConversation: TelegramChat | null;
@@ -39,6 +242,7 @@ export default function ChatWindow({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +402,46 @@ export default function ChatWindow({
       alert('Failed to send file. Please try again.');
     } finally {
       setUploadingFile(false);
+    }
+  };
+
+  const loadImage = async (message: TelegramMessage) => {
+    // Return cached image if already loaded
+    if (loadedImages[message.id]) {
+      return loadedImages[message.id];
+    }
+
+    try {
+      const token = document.cookie.split('auth_token=')[1]?.split(';')[0];
+      const url = `http://localhost:8000/api/messages/download-media/${message.conversation_id}/${message.id}?telegram_message_id=${message.telegram_message_id}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      // Check if media was deleted (410 Gone)
+      if (response.status === 410) {
+        // Mark as deleted
+        setLoadedImages(prev => ({ ...prev, [message.id]: 'DELETED' }));
+        return 'DELETED';
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to load media');
+      }
+
+      const blob = await response.blob();
+      const imageUrl = window.URL.createObjectURL(blob);
+      
+      // Cache the loaded image
+      setLoadedImages(prev => ({ ...prev, [message.id]: imageUrl }));
+      
+      return imageUrl;
+    } catch (error) {
+      console.error('Failed to load media:', error);
+      return null;
     }
   };
 
@@ -430,30 +674,36 @@ export default function ChatWindow({
                       : 'bg-gray-700 text-gray-200 rounded-bl-md'
                   }`}
                 >
-                  {/* Media content */}
-                  {(message.type === 'photo' || message.type === 'video' || message.type === 'document') && (
+                  {/* Photo - Display as inline image like Telegram */}
+                  {message.type === 'photo' && (
+                    <PhotoMessage 
+                      message={message}
+                      loadedImages={loadedImages}
+                      loadImage={loadImage}
+                      onDownload={handleDownloadMedia}
+                    />
+                  )}
+
+                  {/* Video - Display as inline video player like Telegram */}
+                  {message.type === 'video' && (
+                    <VideoMessage 
+                      message={message}
+                      loadedImages={loadedImages}
+                      loadImage={loadImage}
+                      onDownload={handleDownloadMedia}
+                    />
+                  )}
+
+                  {/* Document - keep as icon */}
+                  {message.type === 'document' && (
                     <div className="mb-3">
                       <div className="bg-gray-800/50 rounded-lg p-3 flex items-center space-x-3">
                         <div className="flex-shrink-0">
-                          {message.type === 'photo' && (
-                            <ImageIcon className="w-8 h-8 text-blue-400" />
-                          )}
-                          {message.type === 'video' && (
-                            <Video className="w-8 h-8 text-purple-400" />
-                          )}
-                          {message.type === 'document' && (
-                            <FileText className="w-8 h-8 text-green-400" />
-                          )}
+                          <FileText className="w-8 h-8 text-green-400" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {message.media_file_name || (
-                              <>
-                                {message.type === 'photo' && '📷 Photo'}
-                                {message.type === 'video' && '🎥 Video'}
-                                {message.type === 'document' && '📄 Document'}
-                              </>
-                            )}
+                            {message.media_file_name || '📄 Document'}
                           </p>
                           <p className="text-xs text-gray-400">Click to download</p>
                         </div>

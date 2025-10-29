@@ -132,21 +132,62 @@ class TelegramSession:
                         )
                         
                         for msg in reversed(messages):
-                            if not msg.out and msg.text:  # Only incoming text messages
+                            if not msg.out:  # Only incoming messages (text or media)
                                 try:
                                     # Get sender info safely
                                     sender_info = await self._get_sender_info_safe(msg.sender_id)
                                     
+                                    # Determine message type and extract filename
+                                    msg_type = "text"
+                                    has_media = False
+                                    media_filename = None
+                                    
+                                    if msg.photo:
+                                        msg_type = "photo"
+                                        has_media = True
+                                        media_filename = f"photo_{msg.id}.jpg"
+                                    elif msg.video:
+                                        msg_type = "video"
+                                        has_media = True
+                                        if msg.document and hasattr(msg.document, 'attributes'):
+                                            for attr in msg.document.attributes:
+                                                if hasattr(attr, 'file_name'):
+                                                    media_filename = attr.file_name
+                                                    break
+                                        if not media_filename:
+                                            media_filename = f"video_{msg.id}.mp4"
+                                    elif msg.voice:
+                                        msg_type = "voice"
+                                        has_media = True
+                                        media_filename = f"voice_{msg.id}.ogg"
+                                    elif msg.document:
+                                        msg_type = "document"
+                                        has_media = True
+                                        if hasattr(msg.document, 'attributes'):
+                                            for attr in msg.document.attributes:
+                                                if hasattr(attr, 'file_name'):
+                                                    media_filename = attr.file_name
+                                                    break
+                                        if not media_filename:
+                                            media_filename = f"document_{msg.id}"
+                                    
+                                    # Get conversation type
+                                    conversation_type = self._get_conversation_type(dialog.entity)
+                                    
                                     unread_messages.append({
                                         "message_id": msg.id,
-                                        "text": msg.text,
+                                        "text": msg.text or msg.message or "",
                                         "sender_id": msg.sender_id,
                                         "sender_name": sender_info.get("name"),
                                         "sender_username": sender_info.get("username"),
                                         "peer_id": self._get_peer_id(dialog.entity),
                                         "peer_title": dialog.title if dialog.title is not None else sender_info.get("name"),
+                                        "conversation_type": conversation_type,
                                         "date": msg.date,
-                                        "is_outgoing": msg.out
+                                        "is_outgoing": msg.out,
+                                        "type": msg_type,
+                                        "has_media": has_media,
+                                        "media_filename": media_filename
                                     })
 
                                     await self.client.send_read_acknowledge(dialog.entity, max_id=msg.id)
@@ -250,25 +291,32 @@ class TelegramSession:
             logger.error(f"Error sending media for {self.account_id}: {e}")
             raise
 
-    async def download_media(self, message_id: int, peer_id: int, download_path: str):
+    async def download_media(self, telegram_message_id: int, peer_id: int, download_path: str):
         """Download media from a message"""
         if not self.client or not self.is_connected:
             raise Exception("Client not connected")
 
         try:
-            # Get the message
-            messages = await self.client.get_messages(peer_id, ids=message_id)
-            if not messages or not messages.media:
-                raise Exception("Message not found or has no media")
+            # Get the message from the peer
+            messages = await self.client.get_messages(peer_id, ids=[telegram_message_id])
             
-            message = messages
+            if not messages or len(messages) == 0:
+                raise Exception("Message not found")
+            
+            message = messages[0]
+            
+            if not message or not message.media:
+                raise Exception("Message has no media")
             
             # Download the media
             file_path = await self.client.download_media(message, file=download_path)
             
+            if not file_path:
+                raise Exception("Failed to download media file")
+            
             return file_path
         except Exception as e:
-            logger.error(f"Error downloading media for {self.account_id}: {e}")
+            logger.error(f"Error downloading media for account {self.account_id}, message {telegram_message_id}: {e}")
             raise
 
     def _get_peer_id(self, entity) -> int:
@@ -428,13 +476,13 @@ class TelethonService:
 
         return await session.send_media(peer_id, file_path, caption)
 
-    async def download_media(self, account_id: int, message_id: int, peer_id: int, download_path: str):
+    async def download_media(self, account_id: int, telegram_message_id: int, peer_id: int, download_path: str):
         """Download media from a message"""
         session = self.sessions.get(account_id)
         if not session:
             raise Exception("Session not connected")
 
-        return await session.download_media(message_id, peer_id, download_path)
+        return await session.download_media(telegram_message_id, peer_id, download_path)
 
     async def _setup_event_handlers(self, session: TelegramSession):
         @session.client.on(events.NewMessage)
@@ -446,12 +494,14 @@ class TelethonService:
                 # Get sender information safely
                 sender_info = await session._get_sender_info_safe(message.sender_id)
                 
-                # Get peer title
+                # Get peer title and conversation type
                 try:
                     chat = await event.get_chat()
                     peer_title = getattr(chat, 'title', None) or sender_info["name"]
+                    conversation_type = session._get_conversation_type(chat)
                 except:
                     peer_title = sender_info["name"]
+                    conversation_type = "private"
 
                 # Determine message type and extract filename
                 msg_type = "text"
@@ -496,6 +546,7 @@ class TelethonService:
                     "sender_name": sender_info["name"],
                     "sender_username": sender_info["username"],
                     "peer_title": peer_title,
+                    "conversation_type": conversation_type,
                     "date": message.date,
                     "is_outgoing": message.out,
                     "type": msg_type,
@@ -540,8 +591,12 @@ class TelethonService:
                             "sender_name": msg_data["sender_name"],
                             "sender_username": msg_data["sender_username"],
                             "peer_title": msg_data["peer_title"],
+                            "conversation_type": msg_data.get("conversation_type", "private"),
                             "date": msg_data["date"],
-                            "is_outgoing": msg_data["is_outgoing"]
+                            "is_outgoing": msg_data["is_outgoing"],
+                            "type": msg_data.get("type", "text"),
+                            "has_media": msg_data.get("has_media", False),
+                            "media_filename": msg_data.get("media_filename")
                         }
                         
                         # Call all registered handlers
