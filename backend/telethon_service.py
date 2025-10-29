@@ -250,25 +250,32 @@ class TelegramSession:
             logger.error(f"Error sending media for {self.account_id}: {e}")
             raise
 
-    async def download_media(self, message_id: int, peer_id: int, download_path: str):
+    async def download_media(self, telegram_message_id: int, peer_id: int, download_path: str):
         """Download media from a message"""
         if not self.client or not self.is_connected:
             raise Exception("Client not connected")
 
         try:
-            # Get the message
-            messages = await self.client.get_messages(peer_id, ids=message_id)
-            if not messages or not messages.media:
-                raise Exception("Message not found or has no media")
+            # Get the message from the peer
+            messages = await self.client.get_messages(peer_id, ids=[telegram_message_id])
             
-            message = messages
+            if not messages or len(messages) == 0:
+                raise Exception("Message not found")
+            
+            message = messages[0]
+            
+            if not message or not message.media:
+                raise Exception("Message has no media")
             
             # Download the media
             file_path = await self.client.download_media(message, file=download_path)
             
+            if not file_path:
+                raise Exception("Failed to download media file")
+            
             return file_path
         except Exception as e:
-            logger.error(f"Error downloading media for {self.account_id}: {e}")
+            logger.error(f"Error downloading media for account {self.account_id}, message {telegram_message_id}: {e}")
             raise
 
     def _get_peer_id(self, entity) -> int:
@@ -428,13 +435,13 @@ class TelethonService:
 
         return await session.send_media(peer_id, file_path, caption)
 
-    async def download_media(self, account_id: int, message_id: int, peer_id: int, download_path: str):
+    async def download_media(self, account_id: int, telegram_message_id: int, peer_id: int, download_path: str):
         """Download media from a message"""
         session = self.sessions.get(account_id)
         if not session:
             raise Exception("Session not connected")
 
-        return await session.download_media(message_id, peer_id, download_path)
+        return await session.download_media(telegram_message_id, peer_id, download_path)
 
     async def _setup_event_handlers(self, session: TelegramSession):
         @session.client.on(events.NewMessage)
