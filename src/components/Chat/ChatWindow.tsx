@@ -44,6 +44,21 @@ const PhotoMessage: React.FC<{
     );
   }
 
+  // Check if media was deleted
+  if (imageUrl === 'DELETED') {
+    return (
+      <div className="mb-2">
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 flex items-center space-x-3">
+          <ImageIcon className="w-8 h-8 text-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-300">📷 Photo</p>
+            <p className="text-xs text-red-400">Media has been deleted</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !imageUrl) {
     return (
       <div className="mb-2">
@@ -122,6 +137,21 @@ const VideoMessage: React.FC<{
           <div className="flex flex-col items-center space-y-2">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
             <p className="text-xs text-gray-400">Loading video...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if media was deleted
+  if (videoUrl === 'DELETED') {
+    return (
+      <div className="mb-2">
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 flex items-center space-x-3">
+          <Video className="w-8 h-8 text-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-300">🎥 Video</p>
+            <p className="text-xs text-red-400">Media has been deleted</p>
           </div>
         </div>
       </div>
@@ -391,8 +421,15 @@ export default function ChatWindow({
         },
       });
 
+      // Check if media was deleted (410 Gone)
+      if (response.status === 410) {
+        // Mark as deleted
+        setLoadedImages(prev => ({ ...prev, [message.id]: 'DELETED' }));
+        return 'DELETED';
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to load image');
+        throw new Error('Failed to load media');
       }
 
       const blob = await response.blob();
@@ -403,7 +440,7 @@ export default function ChatWindow({
       
       return imageUrl;
     } catch (error) {
-      console.error('Failed to load image:', error);
+      console.error('Failed to load media:', error);
       return null;
     }
   };

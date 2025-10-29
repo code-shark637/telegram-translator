@@ -379,7 +379,18 @@ async def download_media(
             media_type='application/octet-stream'
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
+        error_msg = str(e).lower()
+        # Check if media was deleted or doesn't exist
+        if "has no media" in error_msg or "message not found" in error_msg:
+            logger.warning(f"Media deleted or not found for message {telegram_message_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Media has been deleted",
+            )
+        
         logger.error(f"Error downloading media: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
