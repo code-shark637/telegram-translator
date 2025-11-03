@@ -184,9 +184,13 @@ const VideoMessage: React.FC<{
         <video
           src={videoUrl}
           controls
+          autoPlay
+          loop
+          muted
+          playsInline
           className="w-full h-auto max-h-[400px] object-contain"
           style={{ display: 'block' }}
-          preload="metadata"
+          preload="auto"
         >
           Your browser does not support the video tag.
         </video>
