@@ -351,24 +351,39 @@ async def download_media(
         )
 
     try:
-        # Create downloads directory if it doesn't exist
-        os.makedirs("temp/downloads", exist_ok=True)
+        # Create structured downloads directory
+        download_dir = f"temp/downloads/{conversation_id}"
+        os.makedirs(download_dir, exist_ok=True)
         
-        download_path = f"temp/downloads/{telegram_message_id}"
+        # Use telegram_message_id as base filename to avoid conflicts
+        # (multiple files can have the same name)
+        base_filename = str(telegram_message_id)
+        download_path = os.path.join(download_dir, base_filename)
         
-        # Download media via Telethon
-        file_path = await telethon_service.download_media(
-            message['telegram_account_id'],
-            telegram_message_id,
-            message['telegram_peer_id'],
-            download_path
-        )
+        # Check if file already exists (with any extension) to avoid re-downloading
+        # Telethon adds extensions like .mp4, .jpg, etc.
+        existing_files = [f for f in os.listdir(download_dir) if f.startswith(base_filename)]
         
-        if not file_path or not os.path.exists(file_path):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Media file not found",
+        if existing_files:
+            # Use the existing cached file
+            cached_file = os.path.join(download_dir, existing_files[0])
+            logger.info(f"Using cached media file: {cached_file}")
+            file_path = cached_file
+        else:
+            # Download media via Telethon
+            logger.info(f"Downloading media for message {telegram_message_id}")
+            file_path = await telethon_service.download_media(
+                message['telegram_account_id'],
+                telegram_message_id,
+                message['telegram_peer_id'],
+                download_path
             )
+            
+            if not file_path or not os.path.exists(file_path):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Media file not found",
+                )
         
         # Use stored filename or fallback to downloaded filename
         filename = message.get('media_file_name') or os.path.basename(file_path)
