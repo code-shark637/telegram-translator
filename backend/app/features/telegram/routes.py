@@ -121,12 +121,53 @@ async def create_account(
         shutil.move(f"{temp_path}/{tg_account_id}/{tg_account_id}.session", session_location)
         tdata.file.close()
 
+    # Try to auto-connect the account
+    try:
+        connected = await telethon_service.connect_session(account_id)
+        
+        if not connected:
+            # Connection failed, delete the account and session file
+            await db.execute(
+                "DELETE FROM telegram_accounts WHERE id = $1",
+                account_id
+            )
+            if os.path.exists(session_location):
+                os.remove(session_location)
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to connect to Telegram. Please check your session file and try again.",
+            )
+        
+        # Update last_used to place account at top of list
+        await db.execute(
+            "UPDATE telegram_accounts SET last_used = NOW() WHERE id = $1",
+            account_id
+        )
+        
+        logger.info(f"New Telegram account created and connected: {account_name} for user {current_user.user_id}")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Connection error, delete the account and session file
+        logger.error(f"Error connecting new account {account_name}: {e}")
+        await db.execute(
+            "DELETE FROM telegram_accounts WHERE id = $1",
+            account_id
+        )
+        if os.path.exists(session_location):
+            os.remove(session_location)
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to connect to Telegram: {str(e)}",
+        )
+
     account = await db.fetchrow(
         "SELECT * FROM telegram_accounts WHERE id = $1 AND is_active = true",
         account_id,
     )
-
-    logger.info(f"New Telegram account created: {account_name} for user {current_user.user_id}")
 
     return {
         "id": account['id'],
@@ -137,7 +178,7 @@ async def create_account(
         "target_language": account['target_language'],
         "created_at": account['created_at'],
         "last_used": account['last_used'],
-        "is_connected": False,
+        "is_connected": True,
     }
 
 
