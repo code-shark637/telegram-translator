@@ -67,59 +67,112 @@ async def create_account(
     tdata: UploadFile = File(None),
     current_user = Depends(get_current_user),
 ):
-    if tdata:
-        temp_path = f"temp"
-        # Read the file content into memory to avoid SpooledTemporaryFile issues
-        file_content = await tdata.read()
-        with zipfile.ZipFile(io.BytesIO(file_content), 'r') as zip_ref:
-            os.makedirs(f"{temp_path}", exist_ok=True)
-            zip_ref.extractall(f"{temp_path}")
-            tg_account_id = zip_ref.namelist()[0].split('/')[0]
-        app_data = json.load(open(f"{temp_path}/{tg_account_id}/{tg_account_id}.json"))
-        account_name = app_data['username']
-        app_id = app_data['app_id']
-        app_hash = app_data['app_hash']
-    else:
+    if not tdata:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="TData file (Zip format) is required",
         )
 
+    # Create temporary extraction directory with timestamp to avoid conflicts
+    import time
+    temp_id = f"{current_user.user_id}_{int(time.time())}"
+    temp_path = f"temp/TData/{temp_id}"
+    
+    try:
+        # Read the file content into memory to avoid SpooledTemporaryFile issues
+        file_content = await tdata.read()
+        with zipfile.ZipFile(io.BytesIO(file_content), 'r') as zip_ref:
+            os.makedirs(temp_path, exist_ok=True)
+            zip_ref.extractall(temp_path)
+            tg_account_id = zip_ref.namelist()[0].split('/')[0]
+        
+        app_data = json.load(open(f"{temp_path}/{tg_account_id}/{tg_account_id}.json"))
+        account_name = app_data['username']
+        app_id = app_data['app_id']
+        app_hash = app_data['app_hash']
+    except Exception as e:
+        # Clean up temp directory on error
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid TData file: {str(e)}",
+        )
+
+    # Check for existing account (only active accounts)
     existing = await db.fetchrow(
-        "SELECT id FROM telegram_accounts WHERE user_id = $1 AND account_name = $2",
+        "SELECT id, is_active FROM telegram_accounts WHERE user_id = $1 AND account_name = $2",
         current_user.user_id,
         account_name,
     )
 
-    if existing:
+    if existing and existing['is_active']:
+        # Clean up temp directory
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Account name already exists",
         )
 
-    account_id = await db.fetchval(
-        """
-        INSERT INTO telegram_accounts
-        (user_id, display_name, account_name, source_language, target_language, app_id, app_hash)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id
-        """,
-        current_user.user_id,
-        displayName,
-        account_name,
-        sourceLanguage,
-        targetLanguage,
-        app_id,
-        app_hash,
-    )
+    # If account exists but is inactive, reactivate it
+    if existing and not existing['is_active']:
+        account_id = existing['id']
+        await db.execute(
+            """
+            UPDATE telegram_accounts 
+            SET is_active = true, 
+                display_name = $1, 
+                source_language = $2, 
+                target_language = $3,
+                app_id = $4,
+                app_hash = $5,
+                last_used = NULL
+            WHERE id = $6
+            """,
+            displayName,
+            sourceLanguage,
+            targetLanguage,
+            app_id,
+            app_hash,
+            account_id,
+        )
+        logger.info(f"Reactivated telegram account: {account_name} for user {current_user.user_id}")
+    else:
+        # Create new account
+        account_id = await db.fetchval(
+            """
+            INSERT INTO telegram_accounts
+            (user_id, display_name, account_name, source_language, target_language, app_id, app_hash)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+            """,
+            current_user.user_id,
+            displayName,
+            account_name,
+            sourceLanguage,
+            targetLanguage,
+            app_id,
+            app_hash,
+        )
 
-    if tdata:
-        tdata_path = f"sessions"
-        os.makedirs(f"{tdata_path}", exist_ok=True)
+    # Move session file to sessions directory
+    tdata_path = f"sessions"
+    os.makedirs(tdata_path, exist_ok=True)
 
-        session_location = f"{tdata_path}/{current_user.user_id}_{account_name}.session"
-        shutil.move(f"{temp_path}/{tg_account_id}/{tg_account_id}.session", session_location)
-        tdata.file.close()
+    session_location = f"{tdata_path}/{current_user.user_id}_{account_name}.session"
+    
+    # Remove old session file if exists
+    if os.path.exists(session_location):
+        os.remove(session_location)
+    
+    shutil.move(f"{temp_path}/{tg_account_id}/{tg_account_id}.session", session_location)
+    
+    # Clean up temp directory
+    if os.path.exists(temp_path):
+        shutil.rmtree(temp_path)
+    
+    tdata.file.close()
 
     # Try to auto-connect the account
     try:
@@ -151,7 +204,9 @@ async def create_account(
         raise
     except Exception as e:
         # Connection error, delete the account and session file
+        error_msg = str(e).lower()
         logger.error(f"Error connecting new account {account_name}: {e}")
+        
         await db.execute(
             "DELETE FROM telegram_accounts WHERE id = $1",
             account_id
@@ -159,9 +214,21 @@ async def create_account(
         if os.path.exists(session_location):
             os.remove(session_location)
         
+        # Provide specific error messages for common issues
+        if "authorization key" in error_msg and "two different ip" in error_msg:
+            detail = "Session conflict: This session is being used on another device or IP address. Please use the session exclusively on one device, or export a new session from Telegram Desktop."
+        elif "unauthorized" in error_msg or "auth key" in error_msg:
+            detail = "Session expired or invalid. Please export a fresh session from Telegram Desktop."
+        elif "flood" in error_msg:
+            detail = "Too many connection attempts. Please wait a few minutes and try again."
+        elif "timeout" in error_msg or "connection" in error_msg:
+            detail = "Connection timeout. Please check your internet connection and try again."
+        else:
+            detail = f"Failed to connect to Telegram: {str(e)}"
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to connect to Telegram: {str(e)}",
+            detail=detail,
         )
 
     account = await db.fetchrow(
@@ -199,15 +266,39 @@ async def connect_account(
             detail="Account not found",
         )
 
-    connected = await telethon_service.connect_session(account_id)
+    try:
+        connected = await telethon_service.connect_session(account_id)
 
-    if not connected:
+        if not connected:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to connect to Telegram. Please check your session file.",
+            )
+
+        return {"message": "Connected successfully", "connected": True}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e).lower()
+        logger.error(f"Error connecting account {account_id}: {e}")
+        
+        # Provide specific error messages for common issues
+        if "authorization key" in error_msg and "two different ip" in error_msg:
+            detail = "Session conflict: This session is being used on another device or IP address. Please use the session exclusively on one device, or export a new session from Telegram Desktop."
+        elif "unauthorized" in error_msg or "auth key" in error_msg:
+            detail = "Session expired or invalid. Please export a fresh session from Telegram Desktop."
+        elif "flood" in error_msg:
+            detail = "Too many connection attempts. Please wait a few minutes and try again."
+        elif "timeout" in error_msg or "connection" in error_msg:
+            detail = "Connection timeout. Please check your internet connection and try again."
+        else:
+            detail = f"Failed to connect to Telegram: {str(e)}"
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to connect to Telegram",
+            detail=detail,
         )
-
-    return {"message": "Connected successfully", "connected": True}
 
 
 @router.post("/accounts/{account_id}/disconnect")
