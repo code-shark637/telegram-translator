@@ -50,7 +50,8 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to add account');
+      const errorMessage = err.response?.data?.detail || err.response?.data?.error || 'Failed to add account';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -181,12 +182,12 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
               {loading ? (
                 <>
                   <Loader className="w-4 h-4 animate-spin" />
-                  <span>Adding...</span>
+                  <span>Connecting...</span>
                 </>
               ) : (
                 <>
                   <Upload className="w-4 h-4" />
-                  <span>Add Account</span>
+                  <span>Add & Connect</span>
                 </>
               )}
             </button>
