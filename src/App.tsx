@@ -193,8 +193,10 @@ function App() {
       if (currentAccount && currentAccount.id === account.id) {
         loadConversations(account.id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to connect account:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to connect to Telegram';
+      alert(errorMessage);
     }
   };
 
