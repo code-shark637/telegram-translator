@@ -326,6 +326,7 @@ export const autoResponderAPI = {
     name: string;
     keywords: string[];
     response_text: string;
+    language: string;
     media_type?: string;
     priority?: number;
     is_active?: boolean;
@@ -338,6 +339,7 @@ export const autoResponderAPI = {
     name?: string;
     keywords?: string[];
     response_text?: string;
+    language?: string;
     media_type?: string;
     priority?: number;
     is_active?: boolean;

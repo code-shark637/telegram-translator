@@ -20,7 +20,7 @@ async def get_rules(current_user = Depends(get_current_user)):
     """Get all auto-responder rules for the current user"""
     rules = await db.fetch(
         """
-        SELECT id, user_id, name, keywords, response_text,
+        SELECT id, user_id, name, keywords, response_text, language,
                media_type, media_file_path, is_active, priority,
                created_at, updated_at
         FROM auto_responder_rules
@@ -42,14 +42,15 @@ async def create_rule(
     rule_id = await db.fetchval(
         """
         INSERT INTO auto_responder_rules
-        (user_id, name, keywords, response_text, media_type, priority, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        (user_id, name, keywords, response_text, language, media_type, priority, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id
         """,
         current_user.user_id,
         rule.name,
         rule.keywords,
         rule.response_text,
+        rule.language,
         rule.media_type,
         rule.priority,
         rule.is_active,
@@ -57,7 +58,7 @@ async def create_rule(
     
     created_rule = await db.fetchrow(
         """
-        SELECT id, user_id, name, keywords, response_text,
+        SELECT id, user_id, name, keywords, response_text, language,
                media_type, media_file_path, is_active, priority,
                created_at, updated_at
         FROM auto_responder_rules
@@ -110,6 +111,11 @@ async def update_rule(
         values.append(rule_update.response_text)
         param_count += 1
     
+    if rule_update.language is not None:
+        updates.append(f"language = ${param_count}")
+        values.append(rule_update.language)
+        param_count += 1
+    
     if rule_update.media_type is not None:
         updates.append(f"media_type = ${param_count}")
         values.append(rule_update.media_type)
@@ -144,7 +150,7 @@ async def update_rule(
     
     updated_rule = await db.fetchrow(
         """
-        SELECT id, user_id, name, keywords, response_text,
+        SELECT id, user_id, name, keywords, response_text, language,
                media_type, media_file_path, is_active, priority,
                created_at, updated_at
         FROM auto_responder_rules

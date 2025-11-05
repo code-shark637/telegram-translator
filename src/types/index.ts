@@ -135,6 +135,7 @@ export interface AutoResponderRule {
   name: string;
   keywords: string[];
   response_text: string;
+  language: string;
   media_type?: string;
   media_file_path?: string;
   is_active: boolean;

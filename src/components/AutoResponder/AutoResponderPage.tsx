@@ -157,6 +157,9 @@ export default function AutoResponderPage() {
                           Priority: {rule.priority}
                         </span>
                       )}
+                      <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">
+                        {rule.language.toUpperCase()}
+                      </span>
                     </div>
                     
                     {/* Keywords */}

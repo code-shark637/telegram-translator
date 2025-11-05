@@ -135,9 +135,10 @@ CREATE INDEX IF NOT EXISTS idx_contact_info_conversation ON contact_info(convers
 CREATE TABLE IF NOT EXISTS auto_responder_rules (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
+  name VARCHAR(100) NOT NULL,
   keywords TEXT[] NOT NULL,
   response_text TEXT NOT NULL,
+  language VARCHAR(10) NOT NULL DEFAULT 'en',
   media_type VARCHAR(20),
   media_file_path TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,

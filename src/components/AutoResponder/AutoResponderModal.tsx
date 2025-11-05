@@ -19,6 +19,7 @@ export default function AutoResponderModal({
   const [name, setName] = useState('');
   const [keywords, setKeywords] = useState<string[]>(['']);
   const [responseText, setResponseText] = useState('');
+  const [language, setLanguage] = useState('en');
   const [priority, setPriority] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -34,6 +35,7 @@ export default function AutoResponderModal({
       setName(rule.name);
       setKeywords(rule.keywords.length > 0 ? rule.keywords : ['']);
       setResponseText(rule.response_text);
+      setLanguage(rule.language || 'en');
       setPriority(rule.priority);
       setIsActive(rule.is_active);
       setExistingMedia(rule.media_type || null);
@@ -42,6 +44,7 @@ export default function AutoResponderModal({
       setName('');
       setKeywords(['']);
       setResponseText('');
+      setLanguage('en');
       setPriority(0);
       setIsActive(true);
       setMediaFile(null);
@@ -115,6 +118,7 @@ export default function AutoResponderModal({
           name: name.trim(),
           keywords: validKeywords,
           response_text: responseText.trim(),
+          language,
           priority,
           is_active: isActive,
         });
@@ -125,6 +129,7 @@ export default function AutoResponderModal({
           name: name.trim(),
           keywords: validKeywords,
           response_text: responseText.trim(),
+          language,
           priority,
           is_active: isActive,
         });
@@ -251,6 +256,30 @@ export default function AutoResponderModal({
               required
               disabled={loading || uploadingMedia}
             />
+          </div>
+
+          {/* Language */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Language *
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loading || uploadingMedia}
+            >
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="ja">Japanese</option>
+              <option value="ru">Russian</option>
+              <option value="zh">Chinese</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-400">
+              Language of keywords and response. Incoming messages will be translated to this language for matching.
+            </p>
           </div>
 
           {/* Media Upload */}

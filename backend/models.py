@@ -190,6 +190,7 @@ class AutoResponderRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     keywords: List[str] = Field(..., min_items=1)
     response_text: str = Field(..., min_length=1)
+    language: str = Field(default='en', max_length=10)
     media_type: Optional[str] = None
     priority: int = 0
     is_active: bool = True
@@ -198,6 +199,7 @@ class AutoResponderRuleUpdate(BaseModel):
     name: Optional[str] = None
     keywords: Optional[List[str]] = None
     response_text: Optional[str] = None
+    language: Optional[str] = None
     media_type: Optional[str] = None
     priority: Optional[int] = None
     is_active: Optional[bool] = None
@@ -208,6 +210,7 @@ class AutoResponderRuleResponse(BaseModel):
     name: str
     keywords: List[str]
     response_text: str
+    language: str
     media_type: Optional[str]
     media_file_path: Optional[str]
     is_active: bool
