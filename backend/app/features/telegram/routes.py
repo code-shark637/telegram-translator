@@ -116,45 +116,64 @@ async def create_account(
         )
 
     # If account exists but is inactive, reactivate it
-    if existing and not existing['is_active']:
-        account_id = existing['id']
-        await db.execute(
-            """
-            UPDATE telegram_accounts 
-            SET is_active = true, 
-                display_name = $1, 
-                source_language = $2, 
-                target_language = $3,
-                app_id = $4,
-                app_hash = $5,
-                last_used = NULL
-            WHERE id = $6
-            """,
-            displayName,
-            sourceLanguage,
-            targetLanguage,
-            app_id,
-            app_hash,
-            account_id,
-        )
-        logger.info(f"Reactivated telegram account: {account_name} for user {current_user.user_id}")
-    else:
-        # Create new account
-        account_id = await db.fetchval(
-            """
-            INSERT INTO telegram_accounts
-            (user_id, display_name, account_name, source_language, target_language, app_id, app_hash)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id
-            """,
-            current_user.user_id,
-            displayName,
-            account_name,
-            sourceLanguage,
-            targetLanguage,
-            app_id,
-            app_hash,
-        )
+    try:
+        if existing and not existing['is_active']:
+            account_id = existing['id']
+            await db.execute(
+                """
+                UPDATE telegram_accounts 
+                SET is_active = true, 
+                    display_name = $1, 
+                    source_language = $2, 
+                    target_language = $3,
+                    app_id = $4,
+                    app_hash = $5,
+                    last_used = NULL
+                WHERE id = $6
+                """,
+                displayName,
+                sourceLanguage,
+                targetLanguage,
+                app_id,
+                app_hash,
+                account_id,
+            )
+            logger.info(f"Reactivated telegram account: {account_name} for user {current_user.user_id}")
+        else:
+            # Create new account
+            account_id = await db.fetchval(
+                """
+                INSERT INTO telegram_accounts
+                (user_id, display_name, account_name, source_language, target_language, app_id, app_hash)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING id
+                """,
+                current_user.user_id,
+                displayName,
+                account_name,
+                sourceLanguage,
+                targetLanguage,
+                app_id,
+                app_hash,
+            )
+    except Exception as e:
+        # Clean up temp directory on database error
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
+        
+        # Handle specific database errors
+        error_msg = str(e)
+        if "uq_telegram_accounts_user_display_name" in error_msg or "duplicate key" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Display name '{displayName}' is already in use. Please choose a different display name.",
+            )
+        else:
+            logger.error(f"Database error creating account: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {str(e)}",
+            )
 
     # Move session file to sessions directory
     tdata_path = f"sessions"
