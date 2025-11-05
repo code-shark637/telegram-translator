@@ -52,6 +52,23 @@ export const authAPI = {
 
 // Telegram API
 export const telegramAPI = {
+  validateTData: async (file: File): Promise<{
+    valid: boolean;
+    account_name: string;
+    exists: boolean;
+    is_active: boolean;
+    current_display_name?: string;
+  }> => {
+    const formData = new FormData();
+    formData.append('tdata', file);
+    const response = await api.post('/telegram/accounts/validate-tdata', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   getAccounts: async (): Promise<TelegramAccount[]> => {
     const response = await api.get('/telegram/accounts');
     const items = response.data as any[];

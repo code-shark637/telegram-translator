@@ -50,7 +50,8 @@ class TelegramSession:
         except Exception as e:
             logger.error(f"Failed to connect session {self.account_id}: {e}")
             self.is_connected = False
-            return False
+            # Re-raise the exception to preserve the detailed error message
+            raise
 
     async def disconnect(self):
         if self.client:
