@@ -72,7 +72,10 @@ CREATE TABLE IF NOT EXISTS messages (
   source_language VARCHAR(16),
   target_language VARCHAR(16),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  edited_at TIMESTAMPTZ
+  edited_at TIMESTAMPTZ,
+  is_outgoing BOOLEAN NOT NULL DEFAULT FALSE,
+  has_media BOOLEAN NOT NULL DEFAULT FALSE,
+  media_file_name VARCHAR(255)
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
@@ -127,3 +130,35 @@ CREATE TABLE IF NOT EXISTS contact_info (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_contact_info_conversation ON contact_info(conversation_id);
+
+-- Auto-responder rules table (global rules for all accounts)
+CREATE TABLE IF NOT EXISTS auto_responder_rules (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  keywords TEXT[] NOT NULL,
+  response_text TEXT NOT NULL,
+  media_type VARCHAR(20),
+  media_file_path TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  priority INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auto_responder_rules_user ON auto_responder_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_auto_responder_rules_active ON auto_responder_rules(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_auto_responder_rules_priority ON auto_responder_rules(user_id, priority DESC);
+
+-- Auto-responder logs (track when rules are triggered)
+CREATE TABLE IF NOT EXISTS auto_responder_logs (
+  id BIGSERIAL PRIMARY KEY,
+  rule_id BIGINT NOT NULL REFERENCES auto_responder_rules(id) ON DELETE CASCADE,
+  conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  incoming_message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  outgoing_message_id BIGINT REFERENCES messages(id) ON DELETE SET NULL,
+  matched_keyword TEXT NOT NULL,
+  triggered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auto_responder_logs_rule ON auto_responder_logs(rule_id);
+CREATE INDEX IF NOT EXISTS idx_auto_responder_logs_conversation ON auto_responder_logs(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_auto_responder_logs_triggered_at ON auto_responder_logs(triggered_at);

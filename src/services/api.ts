@@ -1,6 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import type { User, TelegramAccount, TranslationResult, Language, MessageTemplate, ScheduledMessage, ContactInfo } from '../types';
+import type { User, TelegramAccount, TranslationResult, Language, MessageTemplate, ScheduledMessage, ContactInfo, AutoResponderRule, AutoResponderLog } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -312,5 +312,61 @@ export const contactsAPI = {
 
   deleteContactInfo: async (contactId: number): Promise<void> => {
     await api.delete(`/contacts/${contactId}`);
+  },
+};
+
+// Auto-Responder API
+export const autoResponderAPI = {
+  getRules: async (): Promise<AutoResponderRule[]> => {
+    const response = await api.get('/auto-responder/rules');
+    return response.data;
+  },
+
+  createRule: async (data: {
+    name: string;
+    keywords: string[];
+    response_text: string;
+    media_type?: string;
+    priority?: number;
+    is_active?: boolean;
+  }): Promise<AutoResponderRule> => {
+    const response = await api.post('/auto-responder/rules', data);
+    return response.data;
+  },
+
+  updateRule: async (ruleId: number, data: {
+    name?: string;
+    keywords?: string[];
+    response_text?: string;
+    media_type?: string;
+    priority?: number;
+    is_active?: boolean;
+  }): Promise<AutoResponderRule> => {
+    const response = await api.patch(`/auto-responder/rules/${ruleId}`, data);
+    return response.data;
+  },
+
+  deleteRule: async (ruleId: number): Promise<void> => {
+    await api.delete(`/auto-responder/rules/${ruleId}`);
+  },
+
+  uploadMedia: async (ruleId: number, file: File): Promise<{ message: string; media_type: string; file_path: string }> => {
+    const formData = new FormData();
+    formData.append('media', file);
+    const response = await api.post(`/auto-responder/rules/${ruleId}/upload-media`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  deleteMedia: async (ruleId: number): Promise<void> => {
+    await api.delete(`/auto-responder/rules/${ruleId}/media`);
+  },
+
+  getLogs: async (limit: number = 50): Promise<AutoResponderLog[]> => {
+    const response = await api.get(`/auto-responder/logs?limit=${limit}`);
+    return response.data;
   },
 };
