@@ -26,7 +26,7 @@ export interface TelegramMessage {
   sender_name?: string;
   sender_username?: string;
   peer_title: string;
-  type: 'text' | 'photo' | 'video' | 'voice' | 'document' | 'system';
+  type: 'text' | 'photo' | 'video' | 'voice' | 'document' | 'system' | 'auto_reply';
   original_text: string;
   translated_text?: string;
   source_language?: string;
@@ -127,4 +127,29 @@ export interface TelegramUserSearchResult {
   last_name?: string;
   phone?: string;
   is_contact: boolean;
+}
+
+export interface AutoResponderRule {
+  id: number;
+  user_id: number;
+  name: string;
+  keywords: string[];
+  response_text: string;
+  language: string;
+  media_type?: string;
+  media_file_path?: string;
+  is_active: boolean;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AutoResponderLog {
+  id: number;
+  rule_id: number;
+  rule_name: string;
+  conversation_id: number;
+  conversation_title: string;
+  matched_keyword: string;
+  triggered_at: string;
 }

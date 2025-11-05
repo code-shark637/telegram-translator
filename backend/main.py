@@ -16,8 +16,10 @@ from app.features.translation.routes import router as translation_router
 from app.features.templates.routes import router as templates_router
 from app.features.scheduled.routes import router as scheduled_router
 from app.features.contacts.routes import router as contacts_router
+from app.features.auto_responder.routes import router as auto_responder_router
 from auth import get_current_user
 from jose import jwt, JWTError
+from auto_responder_service import auto_responder_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -116,6 +118,9 @@ async def lifespan(app: FastAPI):
             # Cancel scheduled messages if this is an incoming message
             if not message_data.get('is_outgoing', False):
                 await scheduler_service.cancel_scheduled_messages_for_conversation(conversation_id)
+                
+                # Check auto-responder rules for incoming messages
+                await auto_responder_service.check_and_respond(message_data, account['user_id'])
 
             await manager.send_to_account(
                 {
@@ -183,6 +188,7 @@ app.include_router(messages_router)
 app.include_router(templates_router)
 app.include_router(scheduled_router)
 app.include_router(contacts_router, prefix="/api/contacts", tags=["contacts"])
+app.include_router(auto_responder_router)
 
 @app.get("/")
 async def root():

@@ -13,6 +13,7 @@ import ChatWindow from './components/Chat/ChatWindow';
 import ConversationList from './components/Layout/ConversationList';
 import AddAccountModal from './components/Modals/AddAccountModal';
 import EditAccountModal from './components/Modals/EditAccountModal';
+import AutoResponderPage from './components/AutoResponder/AutoResponderPage';
 
 // Services
 import { telegramAPI, conversationsAPI, messagesAPI } from './services/api';
@@ -298,59 +299,67 @@ function App() {
   // Main application
   return (
     <Router>
-    <div className="h-screen flex flex-col bg-gray-900">
-      <Header />
-      
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          accounts={accounts}
-          currentAccount={currentAccount}
-          onAccountSelect={handleAccountSelect}
-          onAddAccount={() => setShowAddAccountModal(true)}
-          onConnect={handleConnectAccount}
-          onDisconnect={handleDisconnectAccount}
-          onEdit={handleEditAccount}
-          onSoftDelete={handleSoftDelete}
-          unreadCounts={unreadCounts}
+      <div className="h-screen flex flex-col bg-gray-900">
+        <Header />
+        
+        <Routes>
+          {/* Auto-Responder Page */}
+          <Route path="/auto-responder" element={<AutoResponderPage />} />
+          
+          {/* Main Chat Interface */}
+          <Route path="/" element={
+            <div className="flex-1 flex overflow-hidden">
+              <Sidebar
+                accounts={accounts}
+                currentAccount={currentAccount}
+                onAccountSelect={handleAccountSelect}
+                onAddAccount={() => setShowAddAccountModal(true)}
+                onConnect={handleConnectAccount}
+                onDisconnect={handleDisconnectAccount}
+                onEdit={handleEditAccount}
+                onSoftDelete={handleSoftDelete}
+                unreadCounts={unreadCounts}
+              />
+              
+              {currentAccount && (
+                <ConversationList
+                  conversations={conversations}
+                  currentConversation={currentConversation}
+                  onConversationSelect={handleConversationSelect}
+                  isConnected={currentAccount.isConnected}
+                  unreadCounts={unreadCounts[currentAccount.id] || {}}
+                  accountId={currentAccount.id}
+                  onConversationCreated={() => loadConversations(currentAccount.id)}
+                />
+              )}
+              
+              <ChatWindow
+                messages={messages}
+                currentConversation={currentConversation}
+                currentAccount={currentAccount}
+                isConnected={currentAccount?.isConnected || false}
+                sourceLanguage={currentAccount?.sourceLanguage || 'auto'}
+                targetLanguage={currentAccount?.targetLanguage || 'en'}
+                onSendMessage={handleSendMessage}
+                conversationId={currentConversation?.id}
+              />
+            </div>
+          } />
+        </Routes>
+
+        {/* Modals */}
+        <AddAccountModal
+          isOpen={showAddAccountModal}
+          onClose={() => setShowAddAccountModal(false)}
+          onSuccess={loadAccounts}
         />
-        
-        {currentAccount && (
-          <ConversationList
-            conversations={conversations}
-            currentConversation={currentConversation}
-            onConversationSelect={handleConversationSelect}
-            isConnected={currentAccount.isConnected}
-            unreadCounts={unreadCounts[currentAccount.id] || {}}
-            accountId={currentAccount.id}
-            onConversationCreated={() => loadConversations(currentAccount.id)}
-          />
-        )}
-        
-        <ChatWindow
-          messages={messages}
-          currentConversation={currentConversation}
-          currentAccount={currentAccount}
-          isConnected={currentAccount?.isConnected || false}
-          sourceLanguage={currentAccount?.sourceLanguage || 'auto'}
-          targetLanguage={currentAccount?.targetLanguage || 'en'}
-          onSendMessage={handleSendMessage}
-          conversationId={currentConversation?.id}
+        <EditAccountModal
+          isOpen={showEditAccountModal}
+          account={editingAccount}
+          onClose={() => { setShowEditAccountModal(false); setEditingAccount(null); }}
+          onSuccess={loadAccounts}
         />
       </div>
-
-      {/* Modals */}
-      <AddAccountModal
-        isOpen={showAddAccountModal}
-        onClose={() => setShowAddAccountModal(false)}
-        onSuccess={loadAccounts}
-      />
-      <EditAccountModal
-        isOpen={showEditAccountModal}
-        account={editingAccount}
-        onClose={() => { setShowEditAccountModal(false); setEditingAccount(null); }}
-        onSuccess={loadAccounts}
-      />
-    </div>
     </Router>
   );
 }
