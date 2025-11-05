@@ -153,6 +153,29 @@ async def lifespan(app: FastAPI):
 
     telethon_service.add_message_handler(handle_new_message)
     
+    # Auto-connect all active accounts on startup
+    try:
+        accounts = await db.fetch(
+            "SELECT id, account_name FROM telegram_accounts WHERE is_active = true"
+        )
+        
+        if accounts:
+            logger.info(f"Auto-connecting {len(accounts)} active account(s)...")
+            
+            for account in accounts:
+                try:
+                    connected = await telethon_service.connect_session(account['id'])
+                    if connected:
+                        logger.info(f"✓ Connected account: {account['account_name']}")
+                    else:
+                        logger.warning(f"✗ Failed to connect account: {account['account_name']}")
+                except Exception as e:
+                    logger.error(f"✗ Error connecting account {account['account_name']}: {e}")
+        else:
+            logger.info("No active accounts to connect")
+    except Exception as e:
+        logger.error(f"Error during auto-connect: {e}")
+    
     # Start scheduler service
     await scheduler_service.start()
 
