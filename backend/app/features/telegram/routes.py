@@ -26,6 +26,119 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 
 
+@router.post("/accounts/validate-tdata")
+async def validate_tdata(
+    tdata: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+):
+    """Validate TData file and return account info without creating the account"""
+    import time
+    temp_id = f"{current_user.user_id}_{int(time.time())}"
+    temp_path = f"temp/TData/{temp_id}"
+    
+    try:
+        # Read the file content
+        file_content = await tdata.read()
+        
+        # Check if it's a valid zip file
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_content), 'r') as zip_ref:
+                os.makedirs(temp_path, exist_ok=True)
+                zip_ref.extractall(temp_path)
+                
+                # Get the account ID from zip structure
+                namelist = zip_ref.namelist()
+                if not namelist:
+                    raise ValueError("Empty zip file")
+                
+                tg_account_id = namelist[0].split('/')[0]
+        except zipfile.BadZipFile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file format. Please upload a valid TData zip file exported from Telegram Desktop.",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to extract zip file: {str(e)}",
+            )
+        
+        # Check for required files
+        json_file = f"{temp_path}/{tg_account_id}/{tg_account_id}.json"
+        session_file = f"{temp_path}/{tg_account_id}/{tg_account_id}.session"
+        
+        if not os.path.exists(json_file):
+            shutil.rmtree(temp_path)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing account configuration file. Please ensure you exported the complete TData from Telegram Desktop.",
+            )
+        
+        if not os.path.exists(session_file):
+            shutil.rmtree(temp_path)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing session file. Please ensure you exported the complete TData from Telegram Desktop.",
+            )
+        
+        # Parse account data
+        try:
+            app_data = json.load(open(json_file))
+            account_name = app_data.get('username')
+            app_id = app_data.get('app_id')
+            app_hash = app_data.get('app_hash')
+            
+            if not account_name:
+                raise ValueError("Missing username")
+            if not app_id:
+                raise ValueError("Missing app_id")
+            if not app_hash:
+                raise ValueError("Missing app_hash")
+                
+        except json.JSONDecodeError:
+            shutil.rmtree(temp_path)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid configuration file format. The TData file may be corrupted.",
+            )
+        except ValueError as e:
+            shutil.rmtree(temp_path)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid TData file: {str(e)}. Please export a fresh TData from Telegram Desktop.",
+            )
+        
+        # Check if account already exists
+        existing = await db.fetchrow(
+            "SELECT id, is_active, display_name FROM telegram_accounts WHERE user_id = $1 AND account_name = $2",
+            current_user.user_id,
+            account_name,
+        )
+        
+        # Clean up temp directory
+        shutil.rmtree(temp_path)
+        
+        return {
+            "valid": True,
+            "account_name": account_name,
+            "exists": existing is not None,
+            "is_active": existing['is_active'] if existing else False,
+            "current_display_name": existing['display_name'] if existing else None,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Clean up temp directory on error
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
+        logger.error(f"Error validating TData: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate TData file: {str(e)}",
+        )
+
+
 @router.get("/accounts", response_model=List[TelegramAccountResponse])
 async def get_accounts(current_user = Depends(get_current_user)):
     accounts = await db.fetch(
@@ -116,45 +229,64 @@ async def create_account(
         )
 
     # If account exists but is inactive, reactivate it
-    if existing and not existing['is_active']:
-        account_id = existing['id']
-        await db.execute(
-            """
-            UPDATE telegram_accounts 
-            SET is_active = true, 
-                display_name = $1, 
-                source_language = $2, 
-                target_language = $3,
-                app_id = $4,
-                app_hash = $5,
-                last_used = NULL
-            WHERE id = $6
-            """,
-            displayName,
-            sourceLanguage,
-            targetLanguage,
-            app_id,
-            app_hash,
-            account_id,
-        )
-        logger.info(f"Reactivated telegram account: {account_name} for user {current_user.user_id}")
-    else:
-        # Create new account
-        account_id = await db.fetchval(
-            """
-            INSERT INTO telegram_accounts
-            (user_id, display_name, account_name, source_language, target_language, app_id, app_hash)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id
-            """,
-            current_user.user_id,
-            displayName,
-            account_name,
-            sourceLanguage,
-            targetLanguage,
-            app_id,
-            app_hash,
-        )
+    try:
+        if existing and not existing['is_active']:
+            account_id = existing['id']
+            await db.execute(
+                """
+                UPDATE telegram_accounts 
+                SET is_active = true, 
+                    display_name = $1, 
+                    source_language = $2, 
+                    target_language = $3,
+                    app_id = $4,
+                    app_hash = $5,
+                    last_used = NULL
+                WHERE id = $6
+                """,
+                displayName,
+                sourceLanguage,
+                targetLanguage,
+                app_id,
+                app_hash,
+                account_id,
+            )
+            logger.info(f"Reactivated telegram account: {account_name} for user {current_user.user_id}")
+        else:
+            # Create new account
+            account_id = await db.fetchval(
+                """
+                INSERT INTO telegram_accounts
+                (user_id, display_name, account_name, source_language, target_language, app_id, app_hash)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING id
+                """,
+                current_user.user_id,
+                displayName,
+                account_name,
+                sourceLanguage,
+                targetLanguage,
+                app_id,
+                app_hash,
+            )
+    except Exception as e:
+        # Clean up temp directory on database error
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
+        
+        # Handle specific database errors
+        error_msg = str(e)
+        if "uq_telegram_accounts_user_display_name" in error_msg or "duplicate key" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Display name '{displayName}' is already in use. Please choose a different display name.",
+            )
+        else:
+            logger.error(f"Database error creating account: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {str(e)}",
+            )
 
     # Move session file to sessions directory
     tdata_path = f"sessions"

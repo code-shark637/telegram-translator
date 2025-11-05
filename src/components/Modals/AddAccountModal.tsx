@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Upload, Loader, AlertCircle } from 'lucide-react';
 import { telegramAPI } from '../../services/api';
@@ -17,8 +17,17 @@ interface AddAccountModalProps {
 
 export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccountModalProps) {
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tdataFile, setTdataFile] = useState<FileList | null>(null);
+  const [validationInfo, setValidationInfo] = useState<{
+    accountName: string;
+    exists: boolean;
+    isActive: boolean;
+    currentDisplayName?: string;
+  } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -26,6 +35,47 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
     reset,
     formState: { errors },
   } = useForm<AddAccountFormData>();
+
+  const handleFileChange = async (files: FileList | null) => {
+    setTdataFile(files);
+    setError(null);
+    setValidationInfo(null);
+
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    setValidating(true);
+    try {
+      const result = await telegramAPI.validateTData(files[0]);
+      setValidationInfo({
+        accountName: result.account_name,
+        exists: result.exists,
+        isActive: result.is_active,
+        currentDisplayName: result.current_display_name,
+      });
+
+      // Show warning if account exists and is active
+      if (result.exists && result.is_active) {
+        setError(`Account "${result.account_name}" already exists with display name "${result.current_display_name}". Please use a different TData file.`);
+        setTdataFile(null);
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || err.message || 'Invalid TData file';
+      setError(errorMessage);
+      setTdataFile(null);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } finally {
+      setValidating(false);
+    }
+  };
 
   const onSubmit = async (data: AddAccountFormData) => {
     if (!tdataFile || tdataFile.length === 0) {
@@ -58,10 +108,11 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
   };
 
   const handleClose = () => {
-    if (!loading) {
+    if (!loading && !validating) {
       reset();
       setTdataFile(null);
       setError(null);
+      setValidationInfo(null);
       onClose();
     }
   };
@@ -96,16 +147,34 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
             </label>
             <div className="relative">
               <input
+                ref={fileInputRef}
                 type="file"
-                onChange={(e) => setTdataFile(e.target.files)}
+                onChange={(e) => handleFileChange(e.target.files)}
                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:text-sm hover:file:bg-blue-700 transition-colors"
                 accept=".zip"
-                disabled={loading}
+                disabled={loading || validating}
               />
+              {validating && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader className="w-5 h-5 animate-spin text-blue-400" />
+                </div>
+              )}
             </div>
-            <p className="mt-1 text-xs text-gray-400">
-              Upload your Telegram session file (Zip format)
-            </p>
+            {validating && (
+              <p className="mt-1 text-xs text-blue-400">
+                Validating TData file...
+              </p>
+            )}
+            {validationInfo && !error && (
+              <p className="mt-1 text-xs text-green-400">
+                ✓ Valid TData file for account: {validationInfo.accountName}
+              </p>
+            )}
+            {!validating && !validationInfo && !error && (
+              <p className="mt-1 text-xs text-gray-400">
+                Upload your Telegram session file (Zip format)
+              </p>
+            )}
           </div>
 
           <div>
