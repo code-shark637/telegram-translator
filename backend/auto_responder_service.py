@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Dict, Any
 from database import db
 from telethon_service import telethon_service
+from websocket_manager import manager
 
 logger = logging.getLogger(__name__)
 
@@ -100,19 +101,101 @@ class AutoResponderService:
             # Send message with or without media
             if media_type and media_file_path:
                 # Send with media
-                await session.client.send_file(
+                sent_message = await session.client.send_file(
                     peer_id,
                     media_file_path,
                     caption=response_text
                 )
             else:
                 # Send text only
-                await session.client.send_message(
+                sent_message = await session.client.send_message(
                     peer_id,
                     response_text
                 )
             
-            logger.info(f"Sent auto-response to peer {peer_id}")
+            # Get conversation_id
+            conversation = await db.fetchrow(
+                """
+                SELECT id FROM conversations
+                WHERE telegram_account_id = $1 AND telegram_peer_id = $2
+                """,
+                account_id,
+                peer_id
+            )
+            
+            if not conversation:
+                logger.warning(f"Conversation not found for saving auto-reply")
+                return True  # Still return True as message was sent
+            
+            # Get account info for target language
+            account = await db.fetchrow(
+                "SELECT target_language FROM telegram_accounts WHERE id = $1",
+                account_id
+            )
+            
+            # Determine message type based on media
+            msg_type = 'auto_reply'
+            has_media = False
+            media_filename = None
+            
+            if media_type and media_file_path:
+                has_media = True
+                import os
+                media_filename = os.path.basename(media_file_path)
+                # If there's media, use the media type but keep auto_reply for identification
+                # We'll handle this in the frontend
+            
+            # Save the auto-reply message to database
+            message_id = await db.fetchval(
+                """
+                INSERT INTO messages
+                (conversation_id, telegram_message_id, sender_user_id, sender_name, 
+                 sender_username, type, original_text, target_language, created_at, 
+                 is_outgoing, has_media, media_file_name)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id
+                """,
+                conversation['id'],
+                sent_message.id,
+                sent_message.sender_id,
+                'Auto-Responder',
+                'auto_responder',
+                msg_type,
+                response_text,
+                account['target_language'] if account else 'en',
+                sent_message.date,
+                True,  # is_outgoing
+                has_media,
+                media_filename
+            )
+            
+            # Broadcast the message via WebSocket
+            await manager.send_to_account(
+                {
+                    "type": "new_message",
+                    "message": {
+                        "id": message_id,
+                        "conversation_id": conversation['id'],
+                        "telegram_message_id": sent_message.id,
+                        "sender_user_id": sent_message.sender_id,
+                        "sender_name": "Auto-Responder",
+                        "sender_username": "auto_responder",
+                        "type": msg_type,
+                        "original_text": response_text,
+                        "translated_text": None,
+                        "source_language": None,
+                        "target_language": account['target_language'] if account else 'en',
+                        "created_at": sent_message.date.isoformat() if sent_message.date else None,
+                        "is_outgoing": True,
+                        "has_media": has_media,
+                        "media_file_name": media_filename
+                    }
+                },
+                account_id,
+                (await db.fetchval("SELECT user_id FROM telegram_accounts WHERE id = $1", account_id))
+            )
+            
+            logger.info(f"Sent auto-response to peer {peer_id}, message_id: {message_id}")
             return True
             
         except Exception as e:

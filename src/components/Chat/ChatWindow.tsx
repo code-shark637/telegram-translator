@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video, Download, Play } from 'lucide-react';
+import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video, Download, Play, Zap } from 'lucide-react';
 import { templatesAPI, scheduledMessagesAPI } from '../../services/api';
 import type { TelegramMessage, TelegramChat, TelegramAccount, MessageTemplate, ScheduledMessage } from '../../types';
 import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
@@ -678,6 +678,34 @@ export default function ChatWindow({
                       : 'bg-gray-700 text-gray-200 rounded-bl-md'
                   }`}
                 >
+                  {/* Auto-Reply Badge */}
+                  {message.type === 'auto_reply' && (
+                    <div className="flex items-center space-x-1 mb-2 pb-2 border-b border-white/20">
+                      <Zap className="w-3 h-3 text-yellow-400" />
+                      <span className="text-xs font-medium text-yellow-400">Auto-Reply</span>
+                    </div>
+                  )}
+                  
+                  {/* Auto-Reply with Photo */}
+                  {message.type === 'auto_reply' && message.has_media && message.media_file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
+                    <PhotoMessage 
+                      message={message}
+                      loadedImages={loadedImages}
+                      loadImage={loadImage}
+                      onDownload={handleDownloadMedia}
+                    />
+                  )}
+                  
+                  {/* Auto-Reply with Video */}
+                  {message.type === 'auto_reply' && message.has_media && message.media_file_name?.match(/\.(mp4|webm|mov|avi)$/i) && (
+                    <VideoMessage 
+                      message={message}
+                      loadedImages={loadedImages}
+                      loadImage={loadImage}
+                      onDownload={handleDownloadMedia}
+                    />
+                  )}
+                  
                   {/* Photo - Display as inline image like Telegram */}
                   {message.type === 'photo' && (
                     <PhotoMessage 

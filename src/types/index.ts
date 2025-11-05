@@ -26,7 +26,7 @@ export interface TelegramMessage {
   sender_name?: string;
   sender_username?: string;
   peer_title: string;
-  type: 'text' | 'photo' | 'video' | 'voice' | 'document' | 'system';
+  type: 'text' | 'photo' | 'video' | 'voice' | 'document' | 'system' | 'auto_reply';
   original_text: string;
   translated_text?: string;
   source_language?: string;

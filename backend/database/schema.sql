@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at ON conversations(la
 -- Message type enum
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'message_type') THEN
-    CREATE TYPE message_type AS ENUM ('text', 'photo', 'video', 'voice', 'document', 'sticker', 'system');
+    CREATE TYPE message_type AS ENUM ('text', 'photo', 'video', 'voice', 'document', 'sticker', 'system', 'auto_reply');
   END IF;
 END $$;
 
