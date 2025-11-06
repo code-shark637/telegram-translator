@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Search, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, CheckCircle, XCircle, Power } from 'lucide-react';
 import { adminApi } from '../services/api';
 import { ColleagueWithAccounts } from '../types';
 import ColleagueModal from '../components/ColleagueModal';
@@ -55,6 +55,16 @@ const ColleagueManagement = () => {
     } catch (error) {
       console.error('Failed to delete colleague:', error);
       alert('Failed to delete colleague');
+    }
+  };
+
+  const handleToggleActive = async (colleague: ColleagueWithAccounts) => {
+    try {
+      await adminApi.updateColleague(colleague.id, { is_active: !colleague.is_active });
+      await fetchColleagues();
+    } catch (error) {
+      console.error('Failed to toggle colleague status:', error);
+      alert('Failed to update colleague status');
     }
   };
 
@@ -166,6 +176,13 @@ const ColleagueManagement = () => {
                   {new Date(colleague.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => handleToggleActive(colleague)}
+                    className={`${colleague.is_active ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'} mr-3`}
+                    title={colleague.is_active ? 'Deactivate' : 'Activate'}
+                  >
+                    <Power className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => handleEdit(colleague)}
                     className="text-blue-600 hover:text-blue-900 mr-3"

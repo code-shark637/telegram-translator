@@ -17,11 +17,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 errors
+// Handle 401 and 403 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Unauthorized or account deactivated
       Cookies.remove('admin_token');
       window.location.href = '/login';
     }
