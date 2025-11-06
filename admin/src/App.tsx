@@ -1,12 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './hooks/useAuth';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ColleagueManagement from './pages/ColleagueManagement';
 import MessageReview from './pages/MessageReview';
 import Layout from './components/Layout';
 
-function App() {
+function AppRoutes() {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -32,6 +32,14 @@ function App() {
         </Route>
       </Routes>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
 

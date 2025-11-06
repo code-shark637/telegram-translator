@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { Lock } from 'lucide-react';
 
 const Login = () => {
@@ -7,6 +8,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,7 +17,9 @@ const Login = () => {
 
     const success = await login(password);
     
-    if (!success) {
+    if (success) {
+      navigate('/');
+    } else {
       setError('Invalid password');
       setLoading(false);
     }
