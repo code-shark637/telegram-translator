@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Upload, Loader, AlertCircle } from 'lucide-react';
 import { telegramAPI } from '../../services/api';
@@ -35,6 +35,19 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
     reset,
     formState: { errors },
   } = useForm<AddAccountFormData>();
+
+  // Reset all state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      reset();
+      setTdataFile(null);
+      setError(null);
+      setValidationInfo(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isOpen, reset]);
 
   const handleFileChange = async (files: FileList | null) => {
     setTdataFile(files);
@@ -97,6 +110,11 @@ export default function AddAccountModal({ isOpen, onClose, onSuccess }: AddAccou
       
       reset();
       setTdataFile(null);
+      setValidationInfo(null);
+      setError(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       onSuccess();
       onClose();
     } catch (err: any) {
