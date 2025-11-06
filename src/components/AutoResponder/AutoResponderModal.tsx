@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Plus, Trash2, Upload, Image, Video, Loader } from 'lucide-react';
+import { X, Plus, Trash2, Image, Video, Loader } from 'lucide-react';
 import { autoResponderAPI } from '../../services/api';
 import type { AutoResponderRule } from '../../types';
 
