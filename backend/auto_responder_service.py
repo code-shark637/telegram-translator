@@ -180,28 +180,8 @@ class AutoResponderService:
                 account_id
             )
             
-            # Determine message type and handle media
+            # Determine message type
             msg_type = 'auto_reply'
-            has_media = False
-            media_filename = None
-            saved_media_path = None
-            
-            if media_type and media_file_path and sent_message.media:
-                has_media = True
-                import os
-                
-                # Download the sent media to our media folder
-                media_dir = 'media'
-                os.makedirs(media_dir, exist_ok=True)
-                
-                # Generate unique filename
-                file_ext = os.path.splitext(media_file_path)[1]
-                media_filename = f"auto_reply_{sent_message.id}{file_ext}"
-                saved_media_path = os.path.join(media_dir, media_filename)
-                
-                # Download media from Telegram
-                await session.client.download_media(sent_message, file=saved_media_path)
-                logger.info(f"Downloaded auto-reply media to {saved_media_path}")
             
             # Save the auto-reply message to database with both original and translated text
             message_id = await db.fetchval(
@@ -209,8 +189,8 @@ class AutoResponderService:
                 INSERT INTO messages
                 (conversation_id, telegram_message_id, sender_user_id, sender_name, 
                  sender_username, type, original_text, translated_text, source_language,
-                 target_language, created_at, is_outgoing, has_media, media_file_name)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                 target_language, created_at, is_outgoing)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 RETURNING id
                 """,
                 conversation['id'],
@@ -224,9 +204,7 @@ class AutoResponderService:
                 source_lang,  # Rule's language
                 account['target_language'] if account else 'en',
                 sent_message.date,
-                True,  # is_outgoing
-                has_media,
-                media_filename
+                True  # is_outgoing
             )
             
             # Broadcast the message via WebSocket
@@ -246,9 +224,7 @@ class AutoResponderService:
                         "source_language": source_lang,  # Rule's language
                         "target_language": account['target_language'] if account else 'en',
                         "created_at": sent_message.date.isoformat() if sent_message.date else None,
-                        "is_outgoing": True,
-                        "has_media": has_media,
-                        "media_file_name": media_filename
+                        "is_outgoing": True
                     }
                 },
                 account_id,

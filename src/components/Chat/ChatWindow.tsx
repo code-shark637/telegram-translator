@@ -258,6 +258,18 @@ export default function ChatWindow({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Helper to check if message has photo media
+  const hasPhoto = (message: TelegramMessage) => {
+    return message.type === 'photo' || 
+           (message.type === 'auto_reply' && message.media_file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+  };
+
+  // Helper to check if message has video media
+  const hasVideo = (message: TelegramMessage) => {
+    return message.type === 'video' || 
+           (message.type === 'auto_reply' && message.media_file_name?.match(/\.(mp4|webm|mov|avi)$/i));
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -690,30 +702,8 @@ export default function ChatWindow({
                     </div>
                   )}
                   
-                  {/* Auto-Reply with Photo */}
-                  {message.type === 'auto_reply' && message.has_media && message.media_file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
-                    <PhotoMessage 
-                      message={message}
-                      loadedImages={loadedImages}
-                      loadImage={loadImage}
-                      onDownload={handleDownloadMedia}
-                      onImageLoad={scrollToBottom}
-                    />
-                  )}
-                  
-                  {/* Auto-Reply with Video */}
-                  {message.type === 'auto_reply' && message.has_media && message.media_file_name?.match(/\.(mp4|webm|mov|avi)$/i) && (
-                    <VideoMessage 
-                      message={message}
-                      loadedImages={loadedImages}
-                      loadImage={loadImage}
-                      onDownload={handleDownloadMedia}
-                      onImageLoad={scrollToBottom}
-                    />
-                  )}
-                  
                   {/* Photo - Display as inline image like Telegram */}
-                  {message.type === 'photo' && (
+                  {hasPhoto(message) && (
                     <PhotoMessage 
                       message={message}
                       loadedImages={loadedImages}
@@ -724,7 +714,7 @@ export default function ChatWindow({
                   )}
 
                   {/* Video - Display as inline video player like Telegram */}
-                  {message.type === 'video' && (
+                  {hasVideo(message) && (
                     <VideoMessage 
                       message={message}
                       loadedImages={loadedImages}
