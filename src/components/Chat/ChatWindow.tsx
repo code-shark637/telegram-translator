@@ -12,7 +12,8 @@ const PhotoMessage: React.FC<{
   loadedImages: Record<number, string>;
   loadImage: (message: TelegramMessage) => Promise<string | null>;
   onDownload: (message: TelegramMessage) => void;
-}> = ({ message, loadedImages, loadImage, onDownload }) => {
+  onImageLoad?: () => void;
+}> = ({ message, loadedImages, loadImage, onDownload, onImageLoad }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(loadedImages[message.id] || null);
   const [loading, setLoading] = useState(!loadedImages[message.id]);
   const [error, setError] = useState(false);
@@ -89,6 +90,7 @@ const PhotoMessage: React.FC<{
           alt={message.media_file_name || 'Photo'}
           className="w-full h-auto max-h-[400px] object-contain bg-gray-900/50"
           style={{ display: 'block' }}
+          onLoad={() => onImageLoad?.()}
         />
         {/* Download overlay on hover */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center">
@@ -111,7 +113,8 @@ const VideoMessage: React.FC<{
   loadedImages: Record<number, string>;
   loadImage: (message: TelegramMessage) => Promise<string | null>;
   onDownload: (message: TelegramMessage) => void;
-}> = ({ message, loadedImages, loadImage, onDownload }) => {
+  onImageLoad?: () => void;
+}> = ({ message, loadedImages, loadImage, onDownload, onImageLoad }) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(loadedImages[message.id] || null);
   const [loading, setLoading] = useState(!loadedImages[message.id]);
   const [error, setError] = useState(false);
@@ -185,6 +188,7 @@ const VideoMessage: React.FC<{
           src={videoUrl}
           controls
           autoPlay
+          onLoadedData={() => onImageLoad?.()}
           loop
           muted
           playsInline
@@ -693,6 +697,7 @@ export default function ChatWindow({
                       loadedImages={loadedImages}
                       loadImage={loadImage}
                       onDownload={handleDownloadMedia}
+                      onImageLoad={scrollToBottom}
                     />
                   )}
                   
@@ -703,6 +708,7 @@ export default function ChatWindow({
                       loadedImages={loadedImages}
                       loadImage={loadImage}
                       onDownload={handleDownloadMedia}
+                      onImageLoad={scrollToBottom}
                     />
                   )}
                   
@@ -713,6 +719,7 @@ export default function ChatWindow({
                       loadedImages={loadedImages}
                       loadImage={loadImage}
                       onDownload={handleDownloadMedia}
+                      onImageLoad={scrollToBottom}
                     />
                   )}
 
@@ -723,6 +730,7 @@ export default function ChatWindow({
                       loadedImages={loadedImages}
                       loadImage={loadImage}
                       onDownload={handleDownloadMedia}
+                      onImageLoad={scrollToBottom}
                     />
                   )}
 

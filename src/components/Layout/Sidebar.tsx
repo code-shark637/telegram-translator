@@ -25,6 +25,18 @@ export default function Sidebar({
   onSoftDelete,
   unreadCounts,
 }: SidebarProps) {
+  // Sort accounts: connected first, then disconnected, then alphabetically within each group
+  const sortedAccounts = [...accounts].sort((a, b) => {
+    // First, sort by connection status
+    if (a.isConnected && !b.isConnected) return -1;
+    if (!a.isConnected && b.isConnected) return 1;
+    
+    // Within same connection status, sort alphabetically by display name
+    const nameA = (a.displayName || a.accountName).toLowerCase();
+    const nameB = (b.displayName || b.accountName).toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
   return (
     <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
       <div className="p-4 border-b border-gray-700">
@@ -51,7 +63,7 @@ export default function Sidebar({
             </div>
           ) : (
             <div className="space-y-2">
-              {accounts.map((account) => (
+              {sortedAccounts.map((account) => (
                 <div
                   key={account.id}
                   className={`p-3 rounded-lg border transition-all cursor-pointer ${
