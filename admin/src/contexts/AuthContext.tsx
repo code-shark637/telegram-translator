@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import * as Cookies from 'js-cookie';
+import Cookies from 'js-cookie';
 import { adminApi } from '../services/api';
 
 interface AuthContextType {
