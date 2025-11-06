@@ -17,6 +17,7 @@ from app.features.templates.routes import router as templates_router
 from app.features.scheduled.routes import router as scheduled_router
 from app.features.contacts.routes import router as contacts_router
 from app.features.auto_responder.routes import router as auto_responder_router
+from app.features.admin.routes import router as admin_router
 from auth import get_current_user
 from jose import jwt, JWTError
 from auto_responder_service import auto_responder_service
@@ -212,6 +213,7 @@ app.include_router(templates_router)
 app.include_router(scheduled_router)
 app.include_router(contacts_router, prefix="/api/contacts", tags=["contacts"])
 app.include_router(auto_responder_router)
+app.include_router(admin_router)
 
 @app.get("/")
 async def root():
