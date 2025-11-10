@@ -294,7 +294,7 @@ async def get_messages(
         params.append(conversation_id)
         query += f" AND c.id = ${len(params)}"
     
-    query += " ORDER BY m.created_at ASC"
+    query += " ORDER BY m.created_at DESC"
     
     params.append(limit)
     query += f" LIMIT ${len(params)}"
@@ -303,7 +303,7 @@ async def get_messages(
     query += f" OFFSET ${len(params)}"
     
     messages = await db.fetch(query, *params)
-    return [dict(msg) for msg in messages]
+    return [dict(msg) for msg in reversed(messages)]
 
 # Statistics Route
 @router.get("/statistics")

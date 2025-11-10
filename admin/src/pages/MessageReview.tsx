@@ -22,7 +22,7 @@ const MessageReview = () => {
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const MESSAGES_PER_PAGE = 100;
+  const MESSAGES_PER_PAGE = 10;
 
   useEffect(() => {
     const fetchColleagues = async () => {
@@ -54,6 +54,17 @@ const MessageReview = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversationId]);
+
+  // Scroll to bottom when messages first load
+  useEffect(() => {
+    if (messagesContainerRef.current && messages.length > 0 && !loadingMore) {
+      const container = messagesContainerRef.current;
+      // Only scroll to bottom on initial load (when we have exactly one page)
+      if (messages.length <= MESSAGES_PER_PAGE) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  }, [messages.length, loadingMore]);
 
 
   const fetchConversations = async () => {
@@ -88,16 +99,16 @@ const MessageReview = () => {
       const response = await adminApi.getMessages(params);
       const newMessages = response.data;
 
-      // API returns messages sorted by created_at DESC (newest first)
-      // Keep them as-is for display
+      // API returns messages sorted by created_at ASC (oldest first)
+      // Display as-is: oldest at top, newest at bottom
       if (reset) {
         setMessages(newMessages);
       } else {
-        // Append older messages when loading more, filter out duplicates
+        // Prepend older messages when loading more, filter out duplicates
         setMessages(prev => {
           const existingIds = new Set(prev.map(m => m.id));
           const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m.id));
-          return [...prev, ...uniqueNewMessages];
+          return [...uniqueNewMessages, ...prev];
         });
       }
 
@@ -113,11 +124,19 @@ const MessageReview = () => {
   const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current || loadingMore || !hasMore) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const { scrollTop } = messagesContainerRef.current;
     
-    // Load more when scrolled to bottom (to get older messages)
-    if (scrollTop + clientHeight >= scrollHeight - 10) {
+    // Load more when scrolled to top (to get older messages)
+    if (scrollTop === 0) {
+      const prevScrollHeight = messagesContainerRef.current.scrollHeight;
       fetchMessages(false);
+      // Maintain scroll position after loading older messages
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          const newScrollHeight = messagesContainerRef.current.scrollHeight;
+          messagesContainerRef.current.scrollTop = newScrollHeight - prevScrollHeight;
+        }
+      }, 50);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingMore, hasMore, messages.length]);
