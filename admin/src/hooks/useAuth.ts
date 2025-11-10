@@ -19,7 +19,7 @@ export const useAuth = () => {
       try {
         await adminApi.verifyToken();
         setIsAuthenticated(true);
-      } catch (error) {
+      } catch {
         Cookies.remove('admin_token');
         setIsAuthenticated(false);
       } finally {
@@ -37,7 +37,7 @@ export const useAuth = () => {
       Cookies.set('admin_token', access_token, { expires: 7 });
       setIsAuthenticated(true);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   };

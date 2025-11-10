@@ -58,8 +58,9 @@ const ColleagueModal = ({ colleague, onClose }: ColleagueModalProps) => {
         });
       }
       onClose(true);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save colleague');
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Failed to save colleague');
       setLoading(false);
     }
   };
@@ -75,8 +76,9 @@ const ColleagueModal = ({ colleague, onClose }: ColleagueModalProps) => {
       setShowPasswordReset(false);
       setNewPassword('');
       alert('Password reset successfully');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to reset password');
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Failed to reset password');
     } finally {
       setLoading(false);
     }

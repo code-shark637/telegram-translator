@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search, Filter, ArrowLeft, MessageSquare } from 'lucide-react';
 import { adminApi } from '../services/api';
@@ -18,7 +18,11 @@ const MessageReview = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const MESSAGES_PER_PAGE = 100;
 
   useEffect(() => {
     const fetchColleagues = async () => {
@@ -39,17 +43,21 @@ const MessageReview = () => {
     if (selectedUserId || selectedAccountId) {
       fetchConversations();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, selectedAccountId]);
 
   useEffect(() => {
     if (selectedConversationId) {
-      fetchMessages();
+      setMessages([]);
+      setHasMore(true);
+      fetchMessages(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversationId]);
 
   const fetchConversations = async () => {
     try {
-      const params: any = {};
+      const params: { user_id?: number; account_id?: number } = {};
       if (selectedUserId) params.user_id = selectedUserId;
       if (selectedAccountId) params.account_id = selectedAccountId;
       
@@ -60,17 +68,59 @@ const MessageReview = () => {
     }
   };
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (reset = false) => {
+    if (!selectedConversationId || (!reset && !hasMore) || loadingMore) return;
+
     try {
-      const params: any = { limit: 100 };
+      if (reset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const params: { limit: number; offset: number; conversation_id?: number } = {
+        limit: MESSAGES_PER_PAGE,
+        offset: reset ? 0 : messages.length,
+      };
       if (selectedConversationId) params.conversation_id = selectedConversationId;
       
       const response = await adminApi.getMessages(params);
-      setMessages(response.data);
+      const newMessages = response.data;
+
+      if (reset) {
+        setMessages(newMessages);
+      } else {
+        setMessages(prev => [...prev, ...newMessages]);
+      }
+
+      setHasMore(newMessages.length === MESSAGES_PER_PAGE);
     } catch (error) {
       console.error('Failed to fetch messages:', error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const handleScroll = useCallback(() => {
+    if (!messagesContainerRef.current || loadingMore || !hasMore) return;
+
+    const { scrollTop } = messagesContainerRef.current;
+    
+    // Load more when scrolled to top (reversed chat)
+    if (scrollTop === 0) {
+      fetchMessages(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMore, hasMore, messages.length]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
 
   const selectedColleague = colleagues.find((c) => c.id === selectedUserId);
   const accounts = selectedColleague?.accounts || [];
@@ -214,7 +264,15 @@ const MessageReview = () => {
       {/* Messages */}
       {selectedConversationId ? (
         <div className="bg-gray-50 rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="space-y-4 max-h-[600px] overflow-y-auto">
+          <div 
+            ref={messagesContainerRef}
+            className="space-y-4 max-h-[600px] overflow-y-auto"
+          >
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              </div>
+            )}
             {filteredMessages.length > 0 ? (
               filteredMessages.map((message) => {
                 const isFromAccount = isMessageFromAccount(message);
@@ -297,7 +355,11 @@ const MessageReview = () => {
                       {/* Timestamp */}
                       <div className="flex items-center justify-end mt-2">
                         <p className={`text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
-                          {new Date(message.created_at).toLocaleTimeString([], {
+                          {new Date(message.created_at).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(message.created_at).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit'
                           })}

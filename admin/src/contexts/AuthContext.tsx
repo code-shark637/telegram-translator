@@ -1,15 +1,15 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, useEffect, ReactNode } from 'react';
 import Cookies from 'js-cookie';
 import { adminApi } from '../services/api';
 
-interface AuthContextType {
+export interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (password: string) => Promise<boolean>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         await adminApi.verifyToken();
         setIsAuthenticated(true);
-      } catch (error) {
+      } catch {
         Cookies.remove('admin_token');
         setIsAuthenticated(false);
       } finally {
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       Cookies.set('admin_token', access_token, { expires: 7 });
       setIsAuthenticated(true);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   };
@@ -64,10 +64,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
