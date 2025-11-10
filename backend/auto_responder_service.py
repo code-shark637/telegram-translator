@@ -183,14 +183,21 @@ class AutoResponderService:
             # Determine message type
             msg_type = 'auto_reply'
             
+            # Extract media info from sent message
+            has_media = bool(media_type and media_file_path)
+            media_file_name = None
+            if has_media and media_file_path:
+                import os
+                media_file_name = os.path.basename(media_file_path)
+            
             # Save the auto-reply message to database with both original and translated text
             message_id = await db.fetchval(
                 """
                 INSERT INTO messages
                 (conversation_id, telegram_message_id, sender_user_id, sender_name, 
                  sender_username, type, original_text, translated_text, source_language,
-                 target_language, created_at, is_outgoing)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                 target_language, created_at, is_outgoing, has_media, media_file_name)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 RETURNING id
                 """,
                 conversation['id'],
@@ -204,7 +211,9 @@ class AutoResponderService:
                 source_lang,  # Rule's language
                 account['target_language'] if account else 'en',
                 sent_message.date,
-                True  # is_outgoing
+                True,  # is_outgoing
+                has_media,
+                media_file_name
             )
             
             # Broadcast the message via WebSocket
@@ -224,7 +233,9 @@ class AutoResponderService:
                         "source_language": source_lang,  # Rule's language
                         "target_language": account['target_language'] if account else 'en',
                         "created_at": sent_message.date.isoformat() if sent_message.date else None,
-                        "is_outgoing": True
+                        "is_outgoing": True,
+                        "has_media": has_media,
+                        "media_file_name": media_file_name
                     }
                 },
                 account_id,
