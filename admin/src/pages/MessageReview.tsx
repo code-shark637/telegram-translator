@@ -55,6 +55,7 @@ const MessageReview = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversationId]);
 
+
   const fetchConversations = async () => {
     try {
       const params: { user_id?: number; account_id?: number } = {};
@@ -87,10 +88,17 @@ const MessageReview = () => {
       const response = await adminApi.getMessages(params);
       const newMessages = response.data;
 
+      // API returns messages sorted by created_at DESC (newest first)
+      // Keep them as-is for display
       if (reset) {
         setMessages(newMessages);
       } else {
-        setMessages(prev => [...prev, ...newMessages]);
+        // Append older messages when loading more, filter out duplicates
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m.id));
+          return [...prev, ...uniqueNewMessages];
+        });
       }
 
       setHasMore(newMessages.length === MESSAGES_PER_PAGE);
@@ -105,10 +113,10 @@ const MessageReview = () => {
   const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current || loadingMore || !hasMore) return;
 
-    const { scrollTop } = messagesContainerRef.current;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     
-    // Load more when scrolled to top (reversed chat)
-    if (scrollTop === 0) {
+    // Load more when scrolled to bottom (to get older messages)
+    if (scrollTop + clientHeight >= scrollHeight - 10) {
       fetchMessages(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
