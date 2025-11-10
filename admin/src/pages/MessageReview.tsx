@@ -74,6 +74,18 @@ const MessageReview = () => {
 
   const selectedColleague = colleagues.find((c) => c.id === selectedUserId);
   const accounts = selectedColleague?.accounts || [];
+  const selectedConversation = conversations.find((c) => c.id === selectedConversationId);
+
+  // Determine if message is from the account owner (should show on right)
+  const isMessageFromAccount = (message: Message) => {
+    // Compare message sender_user_id with the Telegram account owner's ID
+    // If they match, the message was sent by the account owner (show on right)
+    if (selectedConversation?.account_telegram_user_id && message.sender_user_id) {
+      return message.sender_user_id === selectedConversation.account_telegram_user_id;
+    }
+    // Fallback to is_outgoing if account_telegram_user_id is not available
+    return message.is_outgoing;
+  };
 
   const filteredMessages = messages.filter((msg) =>
     msg.original_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,7 +165,7 @@ const MessageReview = () => {
               <option value="">All Accounts</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.display_name}
+                  {account.display_name} ({account.account_name})
                 </option>
               ))}
             </select>
@@ -201,51 +213,111 @@ const MessageReview = () => {
 
       {/* Messages */}
       {selectedConversationId ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-gray-50 rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="space-y-4 max-h-[600px] overflow-y-auto">
             {filteredMessages.length > 0 ? (
-              filteredMessages.map((message) => (
+              filteredMessages.map((message) => {
+                const isFromAccount = isMessageFromAccount(message);
+                return (
                 <div
                   key={message.id}
-                  className={`flex ${message.is_outgoing ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${isFromAccount ? 'justify-end' : 'justify-start'} mb-4`}
                 >
-                  <div
-                    className={`max-w-[70%] rounded-lg p-4 ${
-                      message.is_outgoing
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <div className="flex items-center mb-2">
-                      <span className="text-xs font-semibold">
-                        {message.sender_name}
-                      </span>
-                      <span className="text-xs ml-2 opacity-75">
-                        {new Date(message.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    {message.original_text && (
-                      <div className="mb-2">
-                        <p className="text-sm">{message.original_text}</p>
-                      </div>
-                    )}
-                    
-                    {message.translated_text && message.translated_text !== message.original_text && (
-                      <div className="pt-2 border-t border-opacity-20 border-current">
-                        <p className="text-xs opacity-75 mb-1">Translation:</p>
-                        <p className="text-sm">{message.translated_text}</p>
+                  <div className={`max-w-[70%] ${isFromAccount ? 'ml-12' : 'mr-12'}`}>
+                    {/* Sender info for incoming messages */}
+                    {!isFromAccount && (
+                      <div className="flex items-center space-x-2 mb-2 px-1">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-medium text-white">
+                            {message.sender_name ? message.sender_name.charAt(0).toUpperCase() : '?'}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-700">
+                            {message.sender_name || message.sender_username || 'Unknown'}
+                          </p>
+                        </div>
                       </div>
                     )}
 
-                    {message.has_media && (
-                      <div className="mt-2 text-xs opacity-75">
-                        📎 {message.media_file_name || 'Media attachment'}
+                    {/* Message bubble */}
+                    <div
+                      className={`px-4 py-3 rounded-2xl ${
+                        isFromAccount
+                          ? 'bg-blue-500 text-white rounded-br-md'
+                          : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-200'
+                      }`}
+                    >
+                      {/* Auto-reply badge */}
+                      {message.type === 'auto_reply' && (
+                        <div className={`flex items-center space-x-1 mb-2 pb-2 border-b ${
+                          isFromAccount ? 'border-white/20' : 'border-gray-200'
+                        }`}>
+                          <span className="text-xs font-medium text-yellow-500">⚡ Auto-Reply</span>
+                        </div>
+                      )}
+
+                      {/* Media indicator */}
+                      {message.has_media && (
+                        <div className={`mb-2 text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+                          📎 {message.media_file_name || 'Media attachment'}
+                        </div>
+                      )}
+                      
+                      {/* Original text */}
+                      {message.original_text && (
+                        <div className="mb-2">
+                          {message.source_language && (
+                            <span className={`text-xs font-medium mr-2 ${
+                              isFromAccount ? 'text-blue-200' : 'text-blue-600'
+                            }`}>
+                              {message.source_language.toUpperCase()}
+                            </span>
+                          )}
+                          <p className="text-sm leading-relaxed">{message.original_text}</p>
+                        </div>
+                      )}
+                      
+                      {/* Translated text */}
+                      {message.translated_text && message.translated_text !== message.original_text && (
+                        <div className={`pt-2 mt-2 border-t ${
+                          isFromAccount ? 'border-white/20' : 'border-gray-200'
+                        }`}>
+                          {message.target_language && (
+                            <span className={`text-xs font-medium mr-2 ${
+                              isFromAccount ? 'text-blue-200' : 'text-blue-600'
+                            }`}>
+                              {message.target_language.toUpperCase()}
+                            </span>
+                          )}
+                          <p className="text-sm leading-relaxed">{message.translated_text}</p>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <div className="flex items-center justify-end mt-2">
+                        <p className={`text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+                          {new Date(message.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        {isFromAccount && (
+                          <div className="flex items-center ml-1">
+                            <svg className="w-3 h-3 text-blue-200" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <svg className="w-3 h-3 text-blue-200 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-12 text-gray-500">
                 No messages found

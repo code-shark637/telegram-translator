@@ -221,8 +221,10 @@ async def get_conversations(
     admin = Depends(get_current_admin)
 ):
     """Get conversations with filters"""
+    from telethon_service import telethon_service
+    
     query = """
-        SELECT c.*, ta.display_name as account_name, u.username as colleague_username
+        SELECT c.*, ta.id as account_id, ta.display_name as account_name, u.username as colleague_username
         FROM conversations c
         JOIN telegram_accounts ta ON ta.id = c.telegram_account_id
         JOIN users u ON u.id = ta.user_id
@@ -241,7 +243,24 @@ async def get_conversations(
     query += " ORDER BY c.last_message_at DESC NULLS LAST"
     
     conversations = await db.fetch(query, *params)
-    return [dict(conv) for conv in conversations]
+    
+    # Add account owner's Telegram user ID to each conversation
+    result = []
+    for conv in conversations:
+        conv_dict = dict(conv)
+        # Try to get the account owner's Telegram user ID from the session
+        session = telethon_service.sessions.get(conv['account_id'])
+        if session and session.client and session.is_connected:
+            try:
+                me = await session.client.get_me()
+                conv_dict['account_telegram_user_id'] = me.id
+            except Exception:
+                conv_dict['account_telegram_user_id'] = None
+        else:
+            conv_dict['account_telegram_user_id'] = None
+        result.append(conv_dict)
+    
+    return result
 
 @router.get("/messages")
 async def get_messages(

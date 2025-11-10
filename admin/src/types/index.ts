@@ -28,6 +28,7 @@ export interface Conversation {
   is_archived: boolean;
   created_at: string;
   last_message_at?: string;
+  account_telegram_user_id?: number;
 }
 
 export interface Message {
