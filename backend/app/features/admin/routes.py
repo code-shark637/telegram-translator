@@ -323,3 +323,125 @@ async def get_statistics(admin = Depends(get_current_admin)):
     """)
     
     return dict(stats)
+
+# Media Download Route for Admin
+@router.get("/download-media/{conversation_id}/{message_id}")
+async def admin_download_media(
+    conversation_id: int,
+    message_id: int,
+    telegram_message_id: int,
+    admin = Depends(get_current_admin)
+):
+    """Download media from a message (admin access)"""
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException, status
+    import os
+    import logging
+    from telethon_service import telethon_service
+    
+    logger = logging.getLogger(__name__)
+    
+    # Get message with account info (admin can access any message)
+    message = await db.fetchrow(
+        """
+        SELECT m.*, c.telegram_account_id, c.telegram_peer_id
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE m.id = $1 AND c.id = $2
+        """,
+        message_id,
+        conversation_id,
+    )
+
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found",
+        )
+
+    try:
+        # Create structured downloads directory
+        download_dir = f"temp/downloads/{conversation_id}"
+        os.makedirs(download_dir, exist_ok=True)
+        
+        # Use telegram_message_id as base filename
+        base_filename = str(telegram_message_id)
+        download_path = os.path.join(download_dir, base_filename)
+        
+        # Check if file already exists (cached)
+        existing_files = [f for f in os.listdir(download_dir) if f.startswith(base_filename)]
+        
+        if existing_files:
+            # Use cached file
+            cached_file = os.path.join(download_dir, existing_files[0])
+            logger.info(f"Using cached media file: {cached_file}")
+            file_path = cached_file
+        else:
+            # Download media via Telethon
+            logger.info(f"Downloading media for message {telegram_message_id}")
+            
+            session = await telethon_service.get_session(message['telegram_account_id'])
+            if not session or not session.is_connected:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Telegram session not available"
+                )
+            
+            try:
+                # Download the media
+                file_path = await session.client.download_media(
+                    telegram_message_id,
+                    file=download_path
+                )
+                
+                if not file_path:
+                    raise HTTPException(
+                        status_code=status.HTTP_410_GONE,
+                        detail="Media has been deleted or is no longer available"
+                    )
+                    
+                logger.info(f"Downloaded media to: {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to download media: {e}")
+                if "deleted" in str(e).lower() or "expired" in str(e).lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_410_GONE,
+                        detail="Media has been deleted"
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to download media: {str(e)}"
+                )
+        
+        # Determine media type from file extension
+        file_ext = os.path.splitext(file_path)[1].lower()
+        media_type_map = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.mp4': 'video/mp4',
+            '.webm': 'video/webm',
+            '.mov': 'video/quicktime',
+            '.avi': 'video/x-msvideo',
+        }
+        media_type = media_type_map.get(file_ext, 'application/octet-stream')
+        
+        # Use stored filename or generate from telegram_message_id
+        filename = message['media_file_name'] or f"media_{telegram_message_id}{file_ext}"
+        
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            filename=filename
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading media: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

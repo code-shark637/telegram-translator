@@ -1,8 +1,170 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Filter, ArrowLeft, MessageSquare } from 'lucide-react';
+import { Search, Filter, ArrowLeft, MessageSquare, Download, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import { adminApi } from '../services/api';
 import { Message, Conversation, ColleagueWithAccounts } from '../types';
+
+// Image Message Component
+const ImageMessage: React.FC<{
+  message: Message;
+  loadedMedia: Record<number, string>;
+  loadMedia: (message: Message) => Promise<string | null>;
+  isFromAccount: boolean;
+}> = ({ message, loadedMedia, loadMedia, isFromAccount }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(loadedMedia[message.id] || null);
+  const [loading, setLoading] = useState(!loadedMedia[message.id]);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!loadedMedia[message.id] && message.has_media) {
+      setLoading(true);
+      loadMedia(message)
+        .then(url => {
+          setImageUrl(url);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError(true);
+          setLoading(false);
+        });
+    }
+  }, [message, loadedMedia, loadMedia]);
+
+  if (loading) {
+    return (
+      <div className="mb-2 rounded-lg overflow-hidden bg-gray-100 max-w-xs">
+        <div className="aspect-video flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-2"></div>
+            <p className="text-xs text-gray-500">Loading image...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (imageUrl === 'DELETED') {
+    return (
+      <div className="mb-2 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2">
+        <ImageIcon className="w-5 h-5 text-red-400" />
+        <div>
+          <p className="text-sm font-medium text-red-600">📷 Photo</p>
+          <p className="text-xs text-red-500">Media has been deleted</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className={`mb-2 text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+        📎 {message.media_file_name || 'Image attachment'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="relative rounded-lg overflow-hidden max-w-md">
+        <img
+          src={imageUrl}
+          alt={message.media_file_name || 'Photo'}
+          className="w-full h-auto max-h-[400px] object-contain bg-gray-100"
+        />
+      </div>
+      {message.media_file_name && (
+        <p className={`text-xs mt-1 ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+          {message.media_file_name}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// Video Message Component
+const VideoMessage: React.FC<{
+  message: Message;
+  loadedMedia: Record<number, string>;
+  loadMedia: (message: Message) => Promise<string | null>;
+  isFromAccount: boolean;
+}> = ({ message, loadedMedia, loadMedia, isFromAccount }) => {
+  const [videoUrl, setVideoUrl] = useState<string | null>(loadedMedia[message.id] || null);
+  const [loading, setLoading] = useState(!loadedMedia[message.id]);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!loadedMedia[message.id] && message.has_media) {
+      setLoading(true);
+      loadMedia(message)
+        .then(url => {
+          setVideoUrl(url);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError(true);
+          setLoading(false);
+        });
+    }
+  }, [message, loadedMedia, loadMedia]);
+
+  if (loading) {
+    return (
+      <div className="mb-2 rounded-lg overflow-hidden bg-gray-100 max-w-xs">
+        <div className="aspect-video flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-2"></div>
+            <p className="text-xs text-gray-500">Loading video...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (videoUrl === 'DELETED') {
+    return (
+      <div className="mb-2 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2">
+        <VideoIcon className="w-5 h-5 text-red-400" />
+        <div>
+          <p className="text-sm font-medium text-red-600">🎥 Video</p>
+          <p className="text-xs text-red-500">Media has been deleted</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !videoUrl) {
+    return (
+      <div className={`mb-2 text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+        📎 {message.media_file_name || 'Video attachment'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="relative rounded-lg overflow-hidden max-w-md bg-gray-100">
+        <video
+          src={videoUrl}
+          controls
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-auto max-h-[400px] object-contain"
+          style={{ display: 'block' }}
+          preload="auto"
+        >
+          Your browser does not support the video tag.
+        </video>
+      </div>
+      {message.media_file_name && (
+        <p className={`text-xs mt-1 ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+          {message.media_file_name}
+        </p>
+      )}
+    </div>
+  );
+};
 
 const MessageReview = () => {
   const { userId } = useParams();
@@ -21,6 +183,7 @@ const MessageReview = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loadedMedia, setLoadedMedia] = useState<Record<number, string>>({});
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const MESSAGES_PER_PAGE = 10;
 
@@ -106,8 +269,8 @@ const MessageReview = () => {
       } else {
         // Prepend older messages when loading more, filter out duplicates
         setMessages(prev => {
-          const existingIds = new Set(prev.map(m => m.id));
-          const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m.id));
+          const existingIds = new Set(prev.map((m: Message) => m.id));
+          const uniqueNewMessages = newMessages.filter((m: Message) => !existingIds.has(m.id));
           return [...uniqueNewMessages, ...prev];
         });
       }
@@ -152,6 +315,42 @@ const MessageReview = () => {
   const selectedColleague = colleagues.find((c) => c.id === selectedUserId);
   const accounts = selectedColleague?.accounts || [];
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId);
+
+  // Load media (image/video) for a message
+  const loadMedia = async (message: Message): Promise<string | null> => {
+    if (loadedMedia[message.id]) {
+      return loadedMedia[message.id];
+    }
+
+    try {
+      const url = `http://localhost:8000/api/admin/download-media/${message.conversation_id}/${message.id}?telegram_message_id=${message.telegram_message_id}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('admin_token=')[1]?.split(';')[0]}`,
+        },
+      });
+
+      if (response.status === 410) {
+        setLoadedMedia(prev => ({ ...prev, [message.id]: 'DELETED' }));
+        return 'DELETED';
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to load media');
+      }
+
+      const blob = await response.blob();
+      const mediaUrl = window.URL.createObjectURL(blob);
+      
+      setLoadedMedia(prev => ({ ...prev, [message.id]: mediaUrl }));
+      
+      return mediaUrl;
+    } catch (error) {
+      console.error('Failed to load media:', error);
+      return null;
+    }
+  };
 
   // Determine if message is from the account owner (should show on right)
   const isMessageFromAccount = (message: Message) => {
@@ -342,12 +541,45 @@ const MessageReview = () => {
                         </div>
                       )}
 
-                      {/* Media indicator */}
-                      {message.has_media && (
-                        <div className={`mb-2 text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
-                          📎 {message.media_file_name || 'Media attachment'}
-                        </div>
-                      )}
+                      {/* Media preview */}
+                      {message.has_media && message.media_file_name && (() => {
+                        const fileName = message.media_file_name.toLowerCase();
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
+                        const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
+                        
+                        if (isImage) {
+                          return (
+                            <ImageMessage
+                              message={message}
+                              loadedMedia={loadedMedia}
+                              loadMedia={loadMedia}
+                              isFromAccount={isFromAccount}
+                            />
+                          );
+                        } else if (isVideo) {
+                          return (
+                            <VideoMessage
+                              message={message}
+                              loadedMedia={loadedMedia}
+                              loadMedia={loadMedia}
+                              isFromAccount={isFromAccount}
+                            />
+                          );
+                        } else {
+                          return (
+                            <div className={`mb-2 flex items-center space-x-2 px-3 py-2 rounded-lg ${
+                              isFromAccount ? 'bg-blue-600' : 'bg-gray-100'
+                            }`}>
+                              <svg className={`w-5 h-5 ${isFromAccount ? 'text-blue-200' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <span className={`text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-600'}`}>
+                                📎 {message.media_file_name}
+                              </span>
+                            </div>
+                          );
+                        }
+                      })()}
                       
                       {/* Original text */}
                       {message.original_text && (
