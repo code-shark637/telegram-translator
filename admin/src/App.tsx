@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ColleagueManagement from './pages/ColleagueManagement';
 import MessageReview from './pages/MessageReview';
+import SecuritySettings from './pages/SecuritySettings';
 import Layout from './components/Layout';
 
 function AppRoutes() {
@@ -30,6 +31,7 @@ function AppRoutes() {
           <Route path="colleagues" element={<ColleagueManagement />} />
           <Route path="messages" element={<MessageReview />} />
           <Route path="messages/:userId" element={<MessageReview />} />
+          <Route path="security" element={<SecuritySettings />} />
         </Route>
       </Routes>
     </Router>

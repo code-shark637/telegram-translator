@@ -62,6 +62,11 @@ export const adminApi = {
 
   // Statistics
   getStatistics: () => api.get('/admin/statistics'),
+
+  // Encryption Settings
+  getEncryptionSettings: () => api.get('/admin/encryption/settings'),
+  updateEncryptionSettings: (data: { encryption_enabled: boolean }) =>
+    api.put('/admin/encryption/settings', data),
 };
 
 export default api;

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 from app.core.config import settings
+from app.core.encryption import initialize_encryption_service, encrypt_message_if_enabled
 from database import db
 from telethon_service import telethon_service
 from websocket_manager import manager
@@ -34,6 +35,13 @@ async def lifespan(app: FastAPI):
 
     await db.connect()
     logger.info("Database connected")
+    
+    # Initialize encryption service
+    if settings.aes_encryption_key:
+        initialize_encryption_service(settings.aes_encryption_key)
+        logger.info("Encryption service initialized")
+    else:
+        logger.warning("AES encryption key not configured - encryption features disabled")
 
     async def handle_new_message(message_data: dict):
         try:
@@ -87,12 +95,17 @@ async def lifespan(app: FastAPI):
                 translated_text = translation['translated_text']
                 source_lang = translation['source_language']
             
+            # Encrypt message if encryption is enabled
+            processed_original, processed_translated, is_encrypted = await encrypt_message_if_enabled(
+                db, text, translated_text
+            )
+            
             message_id = await db.fetchval(
                 """
                 INSERT INTO messages
                 (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
-                 original_text, translated_text, source_language, target_language, created_at, is_outgoing, media_file_name)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                 original_text, translated_text, source_language, target_language, created_at, is_outgoing, media_file_name, is_encrypted)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 RETURNING id
                 """,
                 conversation_id,
@@ -101,13 +114,14 @@ async def lifespan(app: FastAPI):
                 message_data.get('sender_name'),
                 message_data.get('sender_username'),
                 msg_type,
-                text,
-                translated_text,
+                processed_original,
+                processed_translated,
                 source_lang,
                 account['target_language'],
                 created_at,
                 message_data.get('is_outgoing', False),
-                message_data.get('media_filename')
+                message_data.get('media_filename'),
+                is_encrypted
             )
 
             await db.execute(

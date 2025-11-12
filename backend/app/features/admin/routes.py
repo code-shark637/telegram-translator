@@ -1,14 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
 from app.core.admin_security import (
     verify_admin_password,
     create_admin_access_token,
     get_current_admin,
     is_admin_password_set,
 )
+from app.core.encryption import get_encryption_service, decrypt_message_if_encrypted
 from database import db
 from auth import get_password_hash
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -32,6 +37,18 @@ class ColleagueUpdate(BaseModel):
 
 class PasswordReset(BaseModel):
     password: str
+
+class EncryptionSettingsUpdate(BaseModel):
+    encryption_enabled: bool
+
+class EncryptionSettingsResponse(BaseModel):
+    encryption_enabled: bool
+    encryption_enabled_at: Optional[datetime]
+    encryption_disabled_at: Optional[datetime]
+    updated_at: datetime
+    encryption_service_available: bool
+    total_messages: int
+    encrypted_messages: int
 
 # Authentication Routes
 @router.post("/auth/login", response_model=AdminLoginResponse)
@@ -303,7 +320,24 @@ async def get_messages(
     query += f" OFFSET ${len(params)}"
     
     messages = await db.fetch(query, *params)
-    return [dict(msg) for msg in reversed(messages)]
+    
+    # Decrypt messages if they are encrypted
+    result = []
+    for msg in reversed(messages):
+        msg_dict = dict(msg)
+        
+        # Decrypt message if encrypted
+        is_encrypted = msg_dict.get('is_encrypted', False)
+        if is_encrypted:
+            original_text, translated_text = await decrypt_message_if_encrypted(
+                is_encrypted, msg_dict.get('original_text'), msg_dict.get('translated_text')
+            )
+            msg_dict['original_text'] = original_text
+            msg_dict['translated_text'] = translated_text
+        
+        result.append(msg_dict)
+    
+    return result
 
 # Statistics Route
 @router.get("/statistics")
@@ -445,3 +479,103 @@ async def admin_download_media(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+# Encryption Settings Routes
+@router.get("/encryption/settings", response_model=EncryptionSettingsResponse)
+async def get_encryption_settings(admin = Depends(get_current_admin)):
+    """Get current encryption settings and statistics"""
+    # Get encryption settings
+    settings = await db.fetchrow("""
+        SELECT encryption_enabled, encryption_enabled_at, encryption_disabled_at, updated_at
+        FROM system_settings
+        WHERE id = 1
+    """)
+    
+    if not settings:
+        # Initialize settings if not exists
+        await db.execute("""
+            INSERT INTO system_settings (id, encryption_enabled)
+            VALUES (1, FALSE)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        settings = await db.fetchrow("""
+            SELECT encryption_enabled, encryption_enabled_at, encryption_disabled_at, updated_at
+            FROM system_settings
+            WHERE id = 1
+        """)
+    
+    # Get message statistics
+    message_stats = await db.fetchrow("""
+        SELECT 
+            COUNT(*) as total_messages,
+            COUNT(*) FILTER (WHERE is_encrypted = TRUE) as encrypted_messages
+        FROM messages
+    """)
+    
+    # Check if encryption service is available
+    encryption_service = get_encryption_service()
+    
+    return {
+        "encryption_enabled": settings['encryption_enabled'],
+        "encryption_enabled_at": settings['encryption_enabled_at'],
+        "encryption_disabled_at": settings['encryption_disabled_at'],
+        "updated_at": settings['updated_at'],
+        "encryption_service_available": encryption_service is not None,
+        "total_messages": message_stats['total_messages'] or 0,
+        "encrypted_messages": message_stats['encrypted_messages'] or 0,
+    }
+
+@router.put("/encryption/settings")
+async def update_encryption_settings(
+    data: EncryptionSettingsUpdate,
+    admin = Depends(get_current_admin)
+):
+    """Enable or disable encryption for new messages"""
+    # Check if encryption service is available
+    encryption_service = get_encryption_service()
+    if data.encryption_enabled and not encryption_service:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Encryption service not available. Please configure AES_ENCRYPTION_KEY in .env file."
+        )
+    
+    # Get current settings
+    current_settings = await db.fetchrow("""
+        SELECT encryption_enabled FROM system_settings WHERE id = 1
+    """)
+    
+    if not current_settings:
+        # Initialize settings if not exists
+        await db.execute("""
+            INSERT INTO system_settings (id, encryption_enabled)
+            VALUES (1, $1)
+        """, data.encryption_enabled)
+    else:
+        # Update settings
+        if data.encryption_enabled and not current_settings['encryption_enabled']:
+            # Enabling encryption
+            await db.execute("""
+                UPDATE system_settings
+                SET encryption_enabled = TRUE,
+                    encryption_enabled_at = NOW(),
+                    updated_at = NOW(),
+                    updated_by = 'admin'
+                WHERE id = 1
+            """)
+            logger.info("Encryption enabled by admin")
+        elif not data.encryption_enabled and current_settings['encryption_enabled']:
+            # Disabling encryption
+            await db.execute("""
+                UPDATE system_settings
+                SET encryption_enabled = FALSE,
+                    encryption_disabled_at = NOW(),
+                    updated_at = NOW(),
+                    updated_by = 'admin'
+                WHERE id = 1
+            """)
+            logger.info("Encryption disabled by admin")
+    
+    return {
+        "message": f"Encryption {'enabled' if data.encryption_enabled else 'disabled'} successfully",
+        "encryption_enabled": data.encryption_enabled
+    }

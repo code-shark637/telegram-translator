@@ -29,6 +29,9 @@ export interface Conversation {
   created_at: string;
   last_message_at?: string;
   account_telegram_user_id?: number;
+  account_id?: number;
+  account_name?: string;
+  colleague_username?: string;
 }
 
 export interface Message {

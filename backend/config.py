@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 10080
 
     frontend_url: str = "http://localhost:5173"
+    
+    # AES-256 encryption key for message storage
+    aes_encryption_key: str = ""
 
     class Config:
         env_file = ".env"

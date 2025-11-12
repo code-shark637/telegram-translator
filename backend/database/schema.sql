@@ -75,10 +75,12 @@ CREATE TABLE IF NOT EXISTS messages (
   edited_at TIMESTAMPTZ,
   is_outgoing BOOLEAN NOT NULL DEFAULT FALSE,
   has_media BOOLEAN NOT NULL DEFAULT FALSE,
-  media_file_name VARCHAR(255)
+  media_file_name VARCHAR(255),
+  is_encrypted BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_encrypted ON messages(is_encrypted);
 
 -- Message Templates
 CREATE TABLE IF NOT EXISTS message_templates (
@@ -163,3 +165,19 @@ CREATE TABLE IF NOT EXISTS auto_responder_logs (
 CREATE INDEX IF NOT EXISTS idx_auto_responder_logs_rule ON auto_responder_logs(rule_id);
 CREATE INDEX IF NOT EXISTS idx_auto_responder_logs_conversation ON auto_responder_logs(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_auto_responder_logs_triggered_at ON auto_responder_logs(triggered_at);
+
+-- System Settings for encryption and other global configurations
+CREATE TABLE IF NOT EXISTS system_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  encryption_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  encryption_enabled_at TIMESTAMPTZ,
+  encryption_disabled_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by VARCHAR(50) DEFAULT 'admin',
+  CONSTRAINT single_row_check CHECK (id = 1)
+);
+
+-- Insert default settings row
+INSERT INTO system_settings (id, encryption_enabled)
+VALUES (1, FALSE)
+ON CONFLICT (id) DO NOTHING;

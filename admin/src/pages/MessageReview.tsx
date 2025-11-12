@@ -463,7 +463,7 @@ const MessageReview = () => {
               <option value="">Select Conversation</option>
               {conversations.map((conv) => (
                 <option key={conv.id} value={conv.id}>
-                  {conv.title} ({conv.type})
+                  {conv.account_name ? `${conv.account_name} ↔ ${conv.title}` : `${conv.title} (${conv.type})`}
                 </option>
               ))}
             </select>
