@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Filter, ArrowLeft, MessageSquare, Download, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+import { Search, Filter, ArrowLeft, MessageSquare, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 import { adminApi } from '../services/api';
 import { Message, Conversation, ColleagueWithAccounts } from '../types';
 
@@ -16,7 +16,8 @@ const ImageMessage: React.FC<{
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!loadedMedia[message.id] && message.has_media) {
+    const hasMedia = message.media_file_name || ['photo', 'video', 'voice', 'document', 'sticker'].includes(message.type);
+    if (!loadedMedia[message.id] && hasMedia) {
       setLoading(true);
       loadMedia(message)
         .then(url => {
@@ -93,7 +94,8 @@ const VideoMessage: React.FC<{
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!loadedMedia[message.id] && message.has_media) {
+    const hasMedia = message.media_file_name || ['photo', 'video', 'voice', 'document', 'sticker'].includes(message.type);
+    if (!loadedMedia[message.id] && hasMedia) {
       setLoading(true);
       loadMedia(message)
         .then(url => {
@@ -542,10 +544,10 @@ const MessageReview = () => {
                       )}
 
                       {/* Media preview */}
-                      {message.has_media && message.media_file_name && (() => {
-                        const fileName = message.media_file_name.toLowerCase();
-                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
-                        const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
+                      {(message.media_file_name || ['photo', 'video', 'voice', 'document', 'sticker'].includes(message.type)) && (() => {
+                        const fileName = (message.media_file_name || '').toLowerCase();
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName) || message.type === 'photo';
+                        const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName) || message.type === 'video';
                         
                         if (isImage) {
                           return (
