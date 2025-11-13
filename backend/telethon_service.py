@@ -4,6 +4,7 @@ import logging
 from typing import Dict, Optional, List, Callable
 from telethon import TelegramClient, events
 from telethon.tl.types import User, Chat, Channel, Message, PeerUser, PeerChat, PeerChannel
+from telethon.errors import FloodWaitError
 from app.core.config import settings
 from database import db
 import json
@@ -19,6 +20,9 @@ class TelegramSession:
         self.telegram_api_hash = telegram_api_hash
         self.is_connected = False
         self.session_filepath = session_filepath
+        # Rate limiting: track last message time
+        self.last_message_time = None
+        self.min_message_interval = 1.0  # Minimum 1 second between messages
 
     async def connect(self):
         try:
@@ -230,67 +234,107 @@ class TelegramSession:
         
         return {"name": "Unknown", "username": None}
 
-    async def send_message(self, peer_id: int, text: str):
+    async def send_message(self, peer_id: int, text: str, max_retries: int = 3):
         if not self.client or not self.is_connected:
             raise Exception("Client not connected")
 
-        try:
-            message = await self.client.send_message(peer_id, text)
-            
-            # Get current user information
-            me = await self.client.get_me()
-            
-            return {
-                "message_id": message.id,
-                "text": message.text,
-                "date": message.date,
-                "is_outgoing": True,
-                "sender_user_id": me.id,
-                "sender_name": f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown",
-                "sender_username": me.username
-            }
-        except Exception as e:
-            logger.error(f"Error sending message for {self.account_id}: {e}")
-            raise
+        # Rate limiting: wait if needed
+        if self.last_message_time:
+            elapsed = (datetime.now() - self.last_message_time).total_seconds()
+            if elapsed < self.min_message_interval:
+                wait_time = self.min_message_interval - elapsed
+                logger.debug(f"Rate limiting: waiting {wait_time:.2f}s before sending")
+                await asyncio.sleep(wait_time)
 
-    async def send_media(self, peer_id: int, file_path: str, caption: str = ""):
+        retry_count = 0
+        while retry_count <= max_retries:
+            try:
+                message = await self.client.send_message(peer_id, text)
+                self.last_message_time = datetime.now()  # Update last message time
+                
+                # Get current user information
+                me = await self.client.get_me()
+                
+                return {
+                    "message_id": message.id,
+                    "text": message.text,
+                    "date": message.date,
+                    "is_outgoing": True,
+                    "sender_user_id": me.id,
+                    "sender_name": f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown",
+                    "sender_username": me.username
+                }
+            except FloodWaitError as e:
+                wait_time = e.seconds
+                if retry_count < max_retries:
+                    logger.warning(f"FloodWaitError: Waiting {wait_time} seconds before retry {retry_count + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                    retry_count += 1
+                else:
+                    logger.error(f"Max retries reached for account {self.account_id}. FloodWait: {wait_time}s")
+                    raise Exception(f"Rate limit exceeded. Please wait {wait_time} seconds before sending more messages.")
+            except Exception as e:
+                logger.error(f"Error sending message for {self.account_id}: {e}")
+                raise
+
+    async def send_media(self, peer_id: int, file_path: str, caption: str = "", max_retries: int = 3):
         """Send a media file (photo, video, document) to a peer"""
         if not self.client or not self.is_connected:
             raise Exception("Client not connected")
 
-        try:
-            message = await self.client.send_file(
-                peer_id,
-                file_path,
-                caption=caption
-            )
-            
-            # Get current user information
-            me = await self.client.get_me()
-            
-            # Determine message type
-            msg_type = "document"
-            if message.photo:
-                msg_type = "photo"
-            elif message.video:
-                msg_type = "video"
-            elif message.voice:
-                msg_type = "voice"
-            
-            return {
-                "message_id": message.id,
-                "text": caption,
-                "date": message.date,
-                "is_outgoing": True,
-                "type": msg_type,
-                "sender_user_id": me.id,
-                "sender_name": f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown",
-                "sender_username": me.username,
-                "media": message.media
-            }
-        except Exception as e:
-            logger.error(f"Error sending media for {self.account_id}: {e}")
-            raise
+        # Rate limiting: wait if needed
+        if self.last_message_time:
+            elapsed = (datetime.now() - self.last_message_time).total_seconds()
+            if elapsed < self.min_message_interval:
+                wait_time = self.min_message_interval - elapsed
+                logger.debug(f"Rate limiting (media): waiting {wait_time:.2f}s before sending")
+                await asyncio.sleep(wait_time)
+
+        retry_count = 0
+        while retry_count <= max_retries:
+            try:
+                message = await self.client.send_file(
+                    peer_id,
+                    file_path,
+                    caption=caption
+                )
+                self.last_message_time = datetime.now()  # Update last message time
+                
+                # Get current user information
+                me = await self.client.get_me()
+                
+                # Determine message type
+                msg_type = "document"
+                if message.photo:
+                    msg_type = "photo"
+                elif message.video:
+                    msg_type = "video"
+                elif message.voice:
+                    msg_type = "voice"
+                
+                return {
+                    "message_id": message.id,
+                    "text": caption,
+                    "date": message.date,
+                    "is_outgoing": True,
+                    "type": msg_type,
+                    "sender_user_id": me.id,
+                    "sender_name": f"{me.first_name or ''} {me.last_name or ''}".strip() or me.username or "Unknown",
+                    "sender_username": me.username,
+                    "media": message.media
+                }
+            except FloodWaitError as e:
+                wait_time = e.seconds
+                if retry_count < max_retries:
+                    logger.warning(f"FloodWaitError (media): Waiting {wait_time} seconds before retry {retry_count + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                    retry_count += 1
+                else:
+                    logger.error(f"Max retries reached for account {self.account_id}. FloodWait: {wait_time}s")
+                    raise Exception(f"Rate limit exceeded. Please wait {wait_time} seconds before sending more messages.")
+            except Exception as e:
+                logger.error(f"Error sending media for {self.account_id}: {e}")
+                raise
 
     async def download_media(self, telegram_message_id: int, peer_id: int, download_path: str):
         """Download media from a message"""
