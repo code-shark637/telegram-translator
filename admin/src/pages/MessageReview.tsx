@@ -1,0 +1,661 @@
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Search, Filter, ArrowLeft, MessageSquare, Download, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+import { adminApi } from '../services/api';
+import { Message, Conversation, ColleagueWithAccounts } from '../types';
+
+// Image Message Component
+const ImageMessage: React.FC<{
+  message: Message;
+  loadedMedia: Record<number, string>;
+  loadMedia: (message: Message) => Promise<string | null>;
+  isFromAccount: boolean;
+}> = ({ message, loadedMedia, loadMedia, isFromAccount }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(loadedMedia[message.id] || null);
+  const [loading, setLoading] = useState(!loadedMedia[message.id]);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!loadedMedia[message.id] && message.has_media) {
+      setLoading(true);
+      loadMedia(message)
+        .then(url => {
+          setImageUrl(url);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError(true);
+          setLoading(false);
+        });
+    }
+  }, [message, loadedMedia, loadMedia]);
+
+  if (loading) {
+    return (
+      <div className="mb-2 rounded-lg overflow-hidden bg-gray-100 max-w-xs">
+        <div className="aspect-video flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-2"></div>
+            <p className="text-xs text-gray-500">Loading image...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (imageUrl === 'DELETED') {
+    return (
+      <div className="mb-2 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2">
+        <ImageIcon className="w-5 h-5 text-red-400" />
+        <div>
+          <p className="text-sm font-medium text-red-600">📷 Photo</p>
+          <p className="text-xs text-red-500">Media has been deleted</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className={`mb-2 text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+        📎 {message.media_file_name || 'Image attachment'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="relative rounded-lg overflow-hidden max-w-md">
+        <img
+          src={imageUrl}
+          alt={message.media_file_name || 'Photo'}
+          className="w-full h-auto max-h-[400px] object-contain bg-gray-100"
+        />
+      </div>
+      {message.media_file_name && (
+        <p className={`text-xs mt-1 ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+          {message.media_file_name}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// Video Message Component
+const VideoMessage: React.FC<{
+  message: Message;
+  loadedMedia: Record<number, string>;
+  loadMedia: (message: Message) => Promise<string | null>;
+  isFromAccount: boolean;
+}> = ({ message, loadedMedia, loadMedia, isFromAccount }) => {
+  const [videoUrl, setVideoUrl] = useState<string | null>(loadedMedia[message.id] || null);
+  const [loading, setLoading] = useState(!loadedMedia[message.id]);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!loadedMedia[message.id] && message.has_media) {
+      setLoading(true);
+      loadMedia(message)
+        .then(url => {
+          setVideoUrl(url);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError(true);
+          setLoading(false);
+        });
+    }
+  }, [message, loadedMedia, loadMedia]);
+
+  if (loading) {
+    return (
+      <div className="mb-2 rounded-lg overflow-hidden bg-gray-100 max-w-xs">
+        <div className="aspect-video flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-2"></div>
+            <p className="text-xs text-gray-500">Loading video...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (videoUrl === 'DELETED') {
+    return (
+      <div className="mb-2 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2">
+        <VideoIcon className="w-5 h-5 text-red-400" />
+        <div>
+          <p className="text-sm font-medium text-red-600">🎥 Video</p>
+          <p className="text-xs text-red-500">Media has been deleted</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !videoUrl) {
+    return (
+      <div className={`mb-2 text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+        📎 {message.media_file_name || 'Video attachment'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="relative rounded-lg overflow-hidden max-w-md bg-gray-100">
+        <video
+          src={videoUrl}
+          controls
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-auto max-h-[400px] object-contain"
+          style={{ display: 'block' }}
+          preload="auto"
+        >
+          Your browser does not support the video tag.
+        </video>
+      </div>
+      {message.media_file_name && (
+        <p className={`text-xs mt-1 ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+          {message.media_file_name}
+        </p>
+      )}
+    </div>
+  );
+};
+
+const MessageReview = () => {
+  const { userId } = useParams();
+  const navigate = useNavigate();
+  
+  const [colleagues, setColleagues] = useState<ColleagueWithAccounts[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(
+    userId ? parseInt(userId) : null
+  );
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+  
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loadedMedia, setLoadedMedia] = useState<Record<number, string>>({});
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const MESSAGES_PER_PAGE = 10;
+
+  useEffect(() => {
+    const fetchColleagues = async () => {
+      try {
+        const response = await adminApi.getColleagues();
+        setColleagues(response.data);
+      } catch (error) {
+        console.error('Failed to fetch colleagues:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchColleagues();
+  }, []);
+
+  useEffect(() => {
+    if (selectedUserId || selectedAccountId) {
+      fetchConversations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUserId, selectedAccountId]);
+
+  useEffect(() => {
+    if (selectedConversationId) {
+      setMessages([]);
+      setHasMore(true);
+      fetchMessages(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConversationId]);
+
+  // Scroll to bottom when messages first load
+  useEffect(() => {
+    if (messagesContainerRef.current && messages.length > 0 && !loadingMore) {
+      const container = messagesContainerRef.current;
+      // Only scroll to bottom on initial load (when we have exactly one page)
+      if (messages.length <= MESSAGES_PER_PAGE) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  }, [messages.length, loadingMore]);
+
+
+  const fetchConversations = async () => {
+    try {
+      const params: { user_id?: number; account_id?: number } = {};
+      if (selectedUserId) params.user_id = selectedUserId;
+      if (selectedAccountId) params.account_id = selectedAccountId;
+      
+      const response = await adminApi.getConversations(params);
+      setConversations(response.data);
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    }
+  };
+
+  const fetchMessages = async (reset = false) => {
+    if (!selectedConversationId || (!reset && !hasMore) || loadingMore) return;
+
+    try {
+      if (reset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const params: { limit: number; offset: number; conversation_id?: number } = {
+        limit: MESSAGES_PER_PAGE,
+        offset: reset ? 0 : messages.length,
+      };
+      if (selectedConversationId) params.conversation_id = selectedConversationId;
+      
+      const response = await adminApi.getMessages(params);
+      const newMessages = response.data;
+
+      // API returns messages sorted by created_at ASC (oldest first)
+      // Display as-is: oldest at top, newest at bottom
+      if (reset) {
+        setMessages(newMessages);
+      } else {
+        // Prepend older messages when loading more, filter out duplicates
+        setMessages(prev => {
+          const existingIds = new Set(prev.map((m: Message) => m.id));
+          const uniqueNewMessages = newMessages.filter((m: Message) => !existingIds.has(m.id));
+          return [...uniqueNewMessages, ...prev];
+        });
+      }
+
+      setHasMore(newMessages.length === MESSAGES_PER_PAGE);
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleScroll = useCallback(() => {
+    if (!messagesContainerRef.current || loadingMore || !hasMore) return;
+
+    const { scrollTop } = messagesContainerRef.current;
+    
+    // Load more when scrolled to top (to get older messages)
+    if (scrollTop === 0) {
+      const prevScrollHeight = messagesContainerRef.current.scrollHeight;
+      fetchMessages(false);
+      // Maintain scroll position after loading older messages
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          const newScrollHeight = messagesContainerRef.current.scrollHeight;
+          messagesContainerRef.current.scrollTop = newScrollHeight - prevScrollHeight;
+        }
+      }, 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMore, hasMore, messages.length]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
+  const selectedColleague = colleagues.find((c) => c.id === selectedUserId);
+  const accounts = selectedColleague?.accounts || [];
+  const selectedConversation = conversations.find((c) => c.id === selectedConversationId);
+
+  // Load media (image/video) for a message
+  const loadMedia = async (message: Message): Promise<string | null> => {
+    if (loadedMedia[message.id]) {
+      return loadedMedia[message.id];
+    }
+
+    try {
+      const url = `http://localhost:8000/api/admin/download-media/${message.conversation_id}/${message.id}?telegram_message_id=${message.telegram_message_id}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('admin_token=')[1]?.split(';')[0]}`,
+        },
+      });
+
+      if (response.status === 410) {
+        setLoadedMedia(prev => ({ ...prev, [message.id]: 'DELETED' }));
+        return 'DELETED';
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to load media');
+      }
+
+      const blob = await response.blob();
+      const mediaUrl = window.URL.createObjectURL(blob);
+      
+      setLoadedMedia(prev => ({ ...prev, [message.id]: mediaUrl }));
+      
+      return mediaUrl;
+    } catch (error) {
+      console.error('Failed to load media:', error);
+      return null;
+    }
+  };
+
+  // Determine if message is from the account owner (should show on right)
+  const isMessageFromAccount = (message: Message) => {
+    // Compare message sender_user_id with the Telegram account owner's ID
+    // If they match, the message was sent by the account owner (show on right)
+    if (selectedConversation?.account_telegram_user_id && message.sender_user_id) {
+      return message.sender_user_id === selectedConversation.account_telegram_user_id;
+    }
+    // Fallback to is_outgoing if account_telegram_user_id is not available
+    return message.is_outgoing;
+  };
+
+  const filteredMessages = messages.filter((msg) =>
+    msg.original_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    msg.translated_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    msg.sender_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center mb-8">
+        {userId && (
+          <button
+            onClick={() => navigate('/messages')}
+            className="mr-4 p-2 text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
+        <h1 className="text-3xl font-bold text-gray-900">Message Review</h1>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex items-center mb-4">
+          <Filter className="w-5 h-5 text-gray-500 mr-2" />
+          <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Colleague
+            </label>
+            <select
+              value={selectedUserId || ''}
+              onChange={(e) => {
+                const value = e.target.value ? parseInt(e.target.value) : null;
+                setSelectedUserId(value);
+                setSelectedAccountId(null);
+                setSelectedConversationId(null);
+                setMessages([]);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All Colleagues</option>
+              {colleagues.map((colleague) => (
+                <option key={colleague.id} value={colleague.id}>
+                  {colleague.username} ({colleague.accounts.length} accounts)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Telegram Account
+            </label>
+            <select
+              value={selectedAccountId || ''}
+              onChange={(e) => {
+                const value = e.target.value ? parseInt(e.target.value) : null;
+                setSelectedAccountId(value);
+                setSelectedConversationId(null);
+                setMessages([]);
+              }}
+              disabled={!selectedUserId}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            >
+              <option value="">All Accounts</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.display_name} ({account.account_name})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Conversation
+            </label>
+            <select
+              value={selectedConversationId || ''}
+              onChange={(e) => {
+                const value = e.target.value ? parseInt(e.target.value) : null;
+                setSelectedConversationId(value);
+              }}
+              disabled={conversations.length === 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            >
+              <option value="">Select Conversation</option>
+              {conversations.map((conv) => (
+                <option key={conv.id} value={conv.id}>
+                  {conv.account_name ? `${conv.account_name} ↔ ${conv.title}` : `${conv.title} (${conv.type})`}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      {selectedConversationId && (
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search messages..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      {selectedConversationId ? (
+        <div className="bg-gray-50 rounded-xl shadow-sm border border-gray-200 p-6">
+          <div 
+            ref={messagesContainerRef}
+            className="space-y-4 max-h-[600px] overflow-y-auto"
+          >
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+            {filteredMessages.length > 0 ? (
+              filteredMessages.map((message) => {
+                const isFromAccount = isMessageFromAccount(message);
+                return (
+                <div
+                  key={message.id}
+                  className={`flex ${isFromAccount ? 'justify-end' : 'justify-start'} mb-4`}
+                >
+                  <div className={`max-w-[70%] ${isFromAccount ? 'ml-12' : 'mr-12'}`}>
+                    {/* Sender info for incoming messages */}
+                    {!isFromAccount && (
+                      <div className="flex items-center space-x-2 mb-2 px-1">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-medium text-white">
+                            {message.sender_name ? message.sender_name.charAt(0).toUpperCase() : '?'}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-700">
+                            {message.sender_name || message.sender_username || 'Unknown'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Message bubble */}
+                    <div
+                      className={`px-4 py-3 rounded-2xl ${
+                        isFromAccount
+                          ? 'bg-blue-500 text-white rounded-br-md'
+                          : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-200'
+                      }`}
+                    >
+                      {/* Auto-reply badge */}
+                      {message.type === 'auto_reply' && (
+                        <div className={`flex items-center space-x-1 mb-2 pb-2 border-b ${
+                          isFromAccount ? 'border-white/20' : 'border-gray-200'
+                        }`}>
+                          <span className="text-xs font-medium text-yellow-500">⚡ Auto-Reply</span>
+                        </div>
+                      )}
+
+                      {/* Media preview */}
+                      {message.has_media && message.media_file_name && (() => {
+                        const fileName = message.media_file_name.toLowerCase();
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
+                        const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
+                        
+                        if (isImage) {
+                          return (
+                            <ImageMessage
+                              message={message}
+                              loadedMedia={loadedMedia}
+                              loadMedia={loadMedia}
+                              isFromAccount={isFromAccount}
+                            />
+                          );
+                        } else if (isVideo) {
+                          return (
+                            <VideoMessage
+                              message={message}
+                              loadedMedia={loadedMedia}
+                              loadMedia={loadMedia}
+                              isFromAccount={isFromAccount}
+                            />
+                          );
+                        } else {
+                          return (
+                            <div className={`mb-2 flex items-center space-x-2 px-3 py-2 rounded-lg ${
+                              isFromAccount ? 'bg-blue-600' : 'bg-gray-100'
+                            }`}>
+                              <svg className={`w-5 h-5 ${isFromAccount ? 'text-blue-200' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <span className={`text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-600'}`}>
+                                📎 {message.media_file_name}
+                              </span>
+                            </div>
+                          );
+                        }
+                      })()}
+                      
+                      {/* Original text */}
+                      {message.original_text && (
+                        <div className="mb-2">
+                          {message.source_language && (
+                            <span className={`text-xs font-medium mr-2 ${
+                              isFromAccount ? 'text-blue-200' : 'text-blue-600'
+                            }`}>
+                              {message.source_language.toUpperCase()}
+                            </span>
+                          )}
+                          <p className="text-sm leading-relaxed">{message.original_text}</p>
+                        </div>
+                      )}
+                      
+                      {/* Translated text */}
+                      {message.translated_text && message.translated_text !== message.original_text && (
+                        <div className={`pt-2 mt-2 border-t ${
+                          isFromAccount ? 'border-white/20' : 'border-gray-200'
+                        }`}>
+                          {message.target_language && (
+                            <span className={`text-xs font-medium mr-2 ${
+                              isFromAccount ? 'text-blue-200' : 'text-blue-600'
+                            }`}>
+                              {message.target_language.toUpperCase()}
+                            </span>
+                          )}
+                          <p className="text-sm leading-relaxed">{message.translated_text}</p>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <div className="flex items-center justify-end mt-2">
+                        <p className={`text-xs ${isFromAccount ? 'text-blue-100' : 'text-gray-500'}`}>
+                          {new Date(message.created_at).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(message.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        {isFromAccount && (
+                          <div className="flex items-center ml-1">
+                            <svg className="w-3 h-3 text-blue-200" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <svg className="w-3 h-3 text-blue-200 -ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                No messages found
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">
+            Select a colleague and conversation to view messages
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MessageReview;

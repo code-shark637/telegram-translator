@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from config import settings
 from models import TokenData
+from database import db
 
 security = HTTPBearer()
 
@@ -38,6 +39,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    deactivated_exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Account is deactivated",
+    )
 
     try:
         token = credentials.credentials
@@ -47,6 +53,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
         if user_id is None or username is None:
             raise credentials_exception
+
+        # Check if user is still active in database
+        user = await db.fetchrow(
+            "SELECT is_active FROM users WHERE id = $1",
+            user_id
+        )
+        
+        if not user:
+            raise credentials_exception
+            
+        if not user['is_active']:
+            raise deactivated_exception
 
         token_data = TokenData(user_id=user_id, username=username)
         return token_data

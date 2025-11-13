@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Power, PowerOff, Image, Video, X } from 'lucide-react';
 import { autoResponderAPI } from '../../services/api';
 import type { AutoResponderRule } from '../../types';
-import AutoResponderModal from './AutoResponderModal';
+import AutoResponderModal from './AutoResponderModal.tsx';
 
 export default function AutoResponderPage() {
   const [rules, setRules] = useState<AutoResponderRule[]>([]);

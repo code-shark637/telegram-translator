@@ -180,28 +180,15 @@ class AutoResponderService:
                 account_id
             )
             
-            # Determine message type and handle media
+            # Determine message type
             msg_type = 'auto_reply'
-            has_media = False
-            media_filename = None
-            saved_media_path = None
             
-            if media_type and media_file_path and sent_message.media:
-                has_media = True
+            # Extract media info from sent message
+            has_media = bool(media_type and media_file_path)
+            media_file_name = None
+            if has_media and media_file_path:
                 import os
-                
-                # Download the sent media to our media folder
-                media_dir = 'media'
-                os.makedirs(media_dir, exist_ok=True)
-                
-                # Generate unique filename
-                file_ext = os.path.splitext(media_file_path)[1]
-                media_filename = f"auto_reply_{sent_message.id}{file_ext}"
-                saved_media_path = os.path.join(media_dir, media_filename)
-                
-                # Download media from Telegram
-                await session.client.download_media(sent_message, file=saved_media_path)
-                logger.info(f"Downloaded auto-reply media to {saved_media_path}")
+                media_file_name = os.path.basename(media_file_path)
             
             # Save the auto-reply message to database with both original and translated text
             message_id = await db.fetchval(
@@ -226,7 +213,7 @@ class AutoResponderService:
                 sent_message.date,
                 True,  # is_outgoing
                 has_media,
-                media_filename
+                media_file_name
             )
             
             # Broadcast the message via WebSocket
@@ -248,7 +235,7 @@ class AutoResponderService:
                         "created_at": sent_message.date.isoformat() if sent_message.date else None,
                         "is_outgoing": True,
                         "has_media": has_media,
-                        "media_file_name": media_filename
+                        "media_file_name": media_file_name
                     }
                 },
                 account_id,

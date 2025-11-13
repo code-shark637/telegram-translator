@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video, Download, Play, Zap } from 'lucide-react';
+import { Send, Languages, Clock, FileText, Copy, User, Paperclip, X, Image as ImageIcon, Video, Download, Zap } from 'lucide-react';
 import { templatesAPI, scheduledMessagesAPI } from '../../services/api';
 import type { TelegramMessage, TelegramChat, TelegramAccount, MessageTemplate, ScheduledMessage } from '../../types';
 import ScheduleMessageModal from '../Modals/ScheduleMessageModal';
@@ -258,6 +258,18 @@ export default function ChatWindow({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Helper to check if message has photo media
+  const hasPhoto = (message: TelegramMessage) => {
+    return message.type === 'photo' || 
+           (message.type === 'auto_reply' && message.media_file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+  };
+
+  // Helper to check if message has video media
+  const hasVideo = (message: TelegramMessage) => {
+    return message.type === 'video' || 
+           (message.type === 'auto_reply' && message.media_file_name?.match(/\.(mp4|webm|mov|avi)$/i));
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -344,13 +356,6 @@ export default function ChatWindow({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Check file type (images and videos)
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'];
-    // if (!validTypes.includes(file.type)) {
-    //   alert('Please select an image or video file');
-    //   return;
-    // }
 
     // Check file size (max 50MB)
     if (file.size > 50 * 1024 * 1024) {
@@ -690,30 +695,8 @@ export default function ChatWindow({
                     </div>
                   )}
                   
-                  {/* Auto-Reply with Photo */}
-                  {message.type === 'auto_reply' && message.has_media && message.media_file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
-                    <PhotoMessage 
-                      message={message}
-                      loadedImages={loadedImages}
-                      loadImage={loadImage}
-                      onDownload={handleDownloadMedia}
-                      onImageLoad={scrollToBottom}
-                    />
-                  )}
-                  
-                  {/* Auto-Reply with Video */}
-                  {message.type === 'auto_reply' && message.has_media && message.media_file_name?.match(/\.(mp4|webm|mov|avi)$/i) && (
-                    <VideoMessage 
-                      message={message}
-                      loadedImages={loadedImages}
-                      loadImage={loadImage}
-                      onDownload={handleDownloadMedia}
-                      onImageLoad={scrollToBottom}
-                    />
-                  )}
-                  
                   {/* Photo - Display as inline image like Telegram */}
-                  {message.type === 'photo' && (
+                  {hasPhoto(message) && (
                     <PhotoMessage 
                       message={message}
                       loadedImages={loadedImages}
@@ -724,7 +707,7 @@ export default function ChatWindow({
                   )}
 
                   {/* Video - Display as inline video player like Telegram */}
-                  {message.type === 'video' && (
+                  {hasVideo(message) && (
                     <VideoMessage 
                       message={message}
                       loadedImages={loadedImages}

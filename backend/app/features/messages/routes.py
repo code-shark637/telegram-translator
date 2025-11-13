@@ -4,6 +4,7 @@ from typing import List
 from datetime import datetime
 from app.core.database import db
 from app.core.security import get_current_user
+from app.core.encryption import encrypt_message_if_enabled, decrypt_message_if_encrypted
 from models import MessageResponse, MessageSend
 from telethon_service import telethon_service
 from translation_service import translation_service
@@ -54,6 +55,12 @@ async def get_messages(
         # Ensure created_at is not None - use current time if it's None
         created_at = msg['created_at'] if msg['created_at'] is not None else datetime.now()
         
+        # Decrypt message if encrypted
+        is_encrypted = msg.get('is_encrypted', False)
+        original_text, translated_text = await decrypt_message_if_encrypted(
+            is_encrypted, msg['original_text'], msg['translated_text']
+        )
+        
         result.append({
             "id": msg['id'],
             "conversation_id": msg['conversation_id'],
@@ -62,8 +69,8 @@ async def get_messages(
             "sender_name": msg['sender_name'],
             "sender_username": msg['sender_username'],
             "type": msg['type'],
-            "original_text": msg['original_text'],
-            "translated_text": msg['translated_text'],
+            "original_text": original_text,
+            "translated_text": translated_text,
             "source_language": msg['source_language'],
             "target_language": msg['target_language'],
             "created_at": created_at,
@@ -114,12 +121,17 @@ async def send_message(
             translated_text,
         )
 
+        # Encrypt message if encryption is enabled
+        processed_original, processed_translated, is_encrypted = await encrypt_message_if_enabled(
+            db, original_text, translated_text
+        )
+
         message_id = await db.fetchval(
             """
             INSERT INTO messages
             (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type, original_text, translated_text,
-             source_language, target_language, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             source_language, target_language, created_at, is_encrypted)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
             """,
             message_data.conversation_id,
@@ -128,11 +140,12 @@ async def send_message(
             sent_message['sender_name'],
             sent_message['sender_username'],
             'text',
-            original_text,
-            translated_text,
+            processed_original,
+            processed_translated,
             conversation['target_language'],
             conversation['source_language'],
             sent_message['date'],
+            is_encrypted,
         )
 
         await db.execute(
@@ -250,13 +263,18 @@ async def send_media(
             translated_caption
         )
         
+        # Encrypt caption if encryption is enabled
+        processed_original, processed_translated, is_encrypted = await encrypt_message_if_enabled(
+            db, original_caption, translated_caption
+        )
+        
         # Save message to database with both original and translated caption
         message_id = await db.fetchval(
             """
             INSERT INTO messages
             (conversation_id, telegram_message_id, sender_user_id, sender_name, sender_username, type,
-             original_text, translated_text, source_language, target_language, created_at, is_outgoing, media_file_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             original_text, translated_text, source_language, target_language, created_at, is_outgoing, media_file_name, is_encrypted)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING id
             """,
             conversation_id,
@@ -265,13 +283,14 @@ async def send_media(
             sent_message['sender_name'],
             sent_message['sender_username'],
             sent_message['type'],
-            original_caption,
-            translated_caption,
+            processed_original,
+            processed_translated,
             source_lang,
             conversation['source_language'],
             sent_message['date'],
             True,
-            file.filename
+            file.filename,
+            is_encrypted
         )
         
         await db.execute(
