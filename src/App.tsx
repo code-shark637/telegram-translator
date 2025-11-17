@@ -99,7 +99,14 @@ function App() {
             currentConversation &&
             conversationId === currentConversation.id
           ) {
-            setMessages(prev => [...prev, data.message]);
+            setMessages(prev => {
+              // Check if message already exists to prevent duplicates
+              const exists = prev.some(msg => msg.id === data.message.id);
+              if (exists) {
+                return prev;
+              }
+              return [...prev, data.message];
+            });
           }
         } else {
           // If message is for a different account, do not change current conversations; only bump that account's total

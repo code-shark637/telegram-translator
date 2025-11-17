@@ -249,14 +249,18 @@ async def websocket_endpoint(
     websocket: WebSocket,
     token: str = Query(...)
 ):
+    user_id = None
     try:
+        # Validate the token first (before accepting)
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         user_id = payload.get("user_id")
 
         if not user_id:
-            await websocket.close(code=1008)
+            logger.warning("WebSocket connection rejected: No user_id in token")
+            await websocket.close(code=1008, reason="Invalid token")
             return
 
+        # Accept and register the connection (manager.connect does both)
         await manager.connect(websocket, user_id)
 
         try:
@@ -267,13 +271,22 @@ async def websocket_endpoint(
                     await websocket.send_json({"type": "pong"})
 
         except WebSocketDisconnect:
+            logger.info(f"WebSocket disconnected for user {user_id}")
             manager.disconnect(websocket, user_id)
 
-    except JWTError:
-        await websocket.close(code=1008)
+    except JWTError as e:
+        logger.error(f"WebSocket JWT error: {e}")
+        # Can't close if never accepted, just log the error
+        pass
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        await websocket.close(code=1011)
+        logger.error(f"WebSocket error: {e}", exc_info=True)
+        try:
+            if user_id:
+                manager.disconnect(websocket, user_id)
+            if websocket.client_state.name == "CONNECTED":
+                await websocket.close(code=1011, reason="Internal error")
+        except:
+            pass
 
 if __name__ == "__main__":
     import uvicorn
