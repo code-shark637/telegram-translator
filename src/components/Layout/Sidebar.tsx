@@ -25,16 +25,21 @@ export default function Sidebar({
   onSoftDelete,
   unreadCounts,
 }: SidebarProps) {
-  // Sort accounts: connected first, then disconnected, then alphabetically within each group
+  // Natural sort function that handles numbers correctly (1,2,3,11,23 instead of 1,11,2,23,3)
+  const naturalSort = (a: string, b: string): number => {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  };
+
+  // Sort accounts: connected first, then disconnected, then naturally within each group
   const sortedAccounts = [...accounts].sort((a, b) => {
     // First, sort by connection status
     if (a.isConnected && !b.isConnected) return -1;
     if (!a.isConnected && b.isConnected) return 1;
     
-    // Within same connection status, sort alphabetically by display name
+    // Within same connection status, sort naturally by display name
     const nameA = (a.displayName || a.accountName).toLowerCase();
     const nameB = (b.displayName || b.accountName).toLowerCase();
-    return nameA.localeCompare(nameB);
+    return naturalSort(nameA, nameB);
   });
 
   return (
